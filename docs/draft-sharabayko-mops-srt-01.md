@@ -1,7 +1,4 @@
 ```
-
-
-
 MOPS                                                     M.P. Sharabayko
 Internet-Draft                                           M.A. Sharabayko
 Intended status: Standards Track           Haivision Network Video, GmbH
@@ -17,76 +14,72 @@ Expires: 13 March 2021                                           J. Dube
                       draft-sharabayko-mops-srt-01
 ```
 
-# Abstract
+# 概述
+本文档规定了安全可靠传输 (SRT) 协议。
+SRT 是基于UDP的用户级协议，为低延迟实时视频流提供可靠性和安全性优化，以及通用批量数据传输功能。为此，SRT 引入了控制包扩展、改进的流控、增强的拥塞控制和数据加密机制。
 
-   This document specifies Secure Reliable Transport (SRT) protocol.
-   SRT is a user-level protocol over User Datagram Protocol and provides reliability and security optimized for low latenc live video streaming, as well as generic bulk data transfer.  For this, SRT introduces control packet extension, improved flow control, enhanced congestion control and a mechanism for data encryption.
+## 本备忘录的状态
 
-## Status of This Memo
+本互联网草案的提交完全符合 BCP 78 和 BCP 79 的规定。
 
-   This Internet-Draft is submitted in full conformance with the provisions of BCP 78 and BCP 79.
+Internet-Drafts 是 Internet 工程任务组 (IETF) 的工作文件。请注意，其他小组也可以将工作文档作为 Internet-Drafts 分发。当前 Internet-Drafts 列表位于 https://datatracker.ietf.org/drafts/current/。
 
-   Internet-Drafts are working documents of the Internet Engineering Task Force (IETF).  Note that other groups may also distribute working documents as Internet-Drafts.  The list of current Internet-Drafts is at https://datatracker.ietf.org/drafts/current/.
+Internet-Drafts 是有效期最长为六个月的草稿文件，可以随时被其他文件更新、替换或作废。将 Internet-Drafts 用作参考材料或引用它们而不是“正在进行的工作”是不合适的。
 
-   Internet-Drafts are draft documents valid for a maximum of six months and may be updated, replaced, or obsoleted by other documents at any time. It is inappropriate to use Internet-Drafts as reference material or to cite them other than as "work in progress."
+该互联网草案将于 2021 年 3 月 13 日到期。
 
-   This Internet-Draft will expire on 13 March 2021.
+## 版权声明
 
-## Copyright Notice
+版权所有 (c) 2020 IETF Trust 和文件作者。版权所有。
 
-   Copyright (c) 2020 IETF Trust and the persons identified as the document authors.  All rights reserved.
+本文件受 BCP 78 和 IETF 信托关于 IETF 文件的法律规定 (https://trustee.ietf.org/license-info) 的约束，该条款在本文件发布之日生效。
 
-   This document is subject to BCP 78 and the IETF Trust's Legal Provisions Relating to IETF Documents (https://trustee.ietf.org/license-info) in effect on the date of publication of this document.
-
-   Please review these documents carefully, as they describe your rights and restrictions with respect to this document.  Code Components extracted from this document must include Simplified BSD License text as described in Section 4.e of the Trust Legal Provisions and are provided without warranty as described in the Simplified BSD License.
-
-
-# 1. Introduction
-
-## 1.1.  Motivation
-
-   The demand for live video streaming has been increasing steadily for many years.  With the emergence of cloud technologies, many video processing pipeline components have transitioned from on-premises appliances to software running on cloud instances.  While real-time streaming over TCP-based protocols like RTMP [RTMP] is possible at low bitrates and on a small scale, the exponential growth of the streaming market has created a need for more powerful solutions.
-
-   To improve scalability on the delivery side, content delivery networks (CDNs) at one point transitioned to segmentation-based technologies like HLS (HTTP Live Streaming) [RFC8216] and DASH (Dynamic Adaptive Streaming over HTTP) [ISO23009].  This move increased the end-to-end latency of live streaming to over 30 seconds, which makes it unattractive for many use cases.  Over time, the industry optimized these delivery methods, bringing the latency down to 3 seconds.
+请仔细阅读这些文件，因为它们描述了您对本文件的权利和限制。从本文档中提取的代码组件必须包含 Trust Legal Provisions 第 4.e 节中所述的简化 BSD 许可文本，并且按照简化 BSD 许可中的说明在不保证的情况下提供。
 
 
-   While the delivery side scaled up, improvements to video transcoding became a necessity.  Viewers watch video streams on a variety of different devices, connected over different types of networks.  Since upload bandwidth from on-premises locations is often limited, video transcoding moved to the cloud.
+# 1. 简介
 
-   RTMP became the de facto standard for contribution over the public Internet.  But there are limitations for the payload to be transmitted, since RTMP as a media specific protocol only supports two audio channels and a restricted set of audio and video codecs, lacking support for newer formats such as HEVC [H.265], VP9 [VP9], or AV1 [AV1].
+## 1.1 动机
 
-   Since RTMP, HLS and DASH rely on TCP, these protocols can only guarantee acceptable reliability over connections with low RTTs, and can not use the bandwidth of network connections to their full extent due to limitations imposed by congestion control.  Notably, QUIC[I-D.ietf-quic-transport] has been designed to address these problems with HTTP-based delivery protocols in HTTP/3 [I-D.ietf-quic-http].
-   Like QUIC, SRT [SRTSRC] uses UDP instead of the TCP transport protocol, but assures more reliable delivery using Automatic Repeat Request (ARQ), packet acknowledgments, end-to-end latency management,etc.
+多年来，对实时视频流的需求一直在稳步增长。随着云技术的出现，许多视频处理组件已从本地设备过渡到在云上软件。虽然通过 RTMP [RTMP] 等基于 TCP 协议的实时流式传输，可在低比特率和小范围内实现，但流式传输市场的指数级增长催生了对更强大解决方案的需求。
 
-## 1.2.  Secure Reliable Transport Protocol
+为了提高交付端的可扩展性，内容交付网络 (CDN) 一度过渡到基于分段的技术，例如 HLS（HTTP 实时流媒体）[RFC8216] 和 DASH（HTTP 上的动态自适应流媒体）[ISO23009]。这一举措将实时流媒体的端到端延迟增加到 30 秒以上，这使得它对许多用例没有吸引力。随着时间的推移，业界优化了这些交付方式，将延迟降至 3 秒。
 
-   Low latency video transmissions across reliable (usually local) IP based networks typically take the form of MPEG-TS [ISO13818-1] unicast or multicast streams using the UDP/RTP protocol, where any packet loss can be mitigated by enabling forward error correction (FEC).  Achieving the same low latency between sites in different cities, countries or even continents is more challenging.  While it is possible with satellite links or dedicated MPLS [RFC3031] networks, these are expensive solutions.  The use of public Internet connectivity, while less expensive, imposes significant bandwidth overhead to achieve the necessary level of packet loss recovery.Introducing selective packet retransmission (reliable UDP) to recover from packet loss removes those limitations.
+在交付规模扩大的同时，改进视频转码成为必要。观众在通过不同网络连接，在各种不同设备上观看视频流。由于来自本地位置的上传带宽通常是有限的，因此视频转码也转到了云端。
 
-   Derived from the UDP-based Data Transfer (UDT) protocol [GHG04b], SRT is a user-level protocol that retains most of the core concepts and mechanisms while introducing several refinements and enhancements, including control packet modifications, improved flow control for handling live streaming, enhanced congestion control, and a mechanism for encrypting packets.
+RTMP 成为通过公共 Internet 进行视频分发的实际标准。但其传输有效载荷是有限制的，RTMP 作为媒体特定协议仅支持两个音频通道和一组受限的音频和视频编解码器，缺乏对 HEVC [H.265]、VP9 [VP9] 或 AV1 [AV1] 等新格式的支持。
 
+由于 RTMP、HLS 和 DASH 依赖于 TCP，这些协议只能在低 RTT 连接上实现可接受的可靠性；由于Tcp拥塞控制的限制，它们不能充分利用网络带宽。值得注意的是，QUIC[ID.ietf-quic-transport] 旨在解决 HTTP/3 [ID.ietf-quic-http] 中基于 HTTP 的交付协议的这些问题。
+与 QUIC 一样，SRT [SRTSRC] 使用 UDP 而不是 TCP 传输协议，但使用自动重复请求 (ARQ)、数据包确认、端到端延迟管理等来确保更可靠的交付。
 
-   SRT is a transport protocol that enables the secure, reliable transport of data across unpredictable networks, such as the Internet.  While any data type can be transferred via SRT, it is ideal for low latency (sub-second) video streaming.  SRT provides improved bandwidth utilization compared to RTMP, allowing much higher contribution bitrates over long distance connections.
+## 1.2 安全可靠的传输协议
 
-   As packets are streamed from source to destination, SRT detects and adapts to the real-time network conditions between the two endpoints, and helps compensate for jitter and bandwidth fluctuations due to congestion over noisy networks.  Its error recovery mechanism minimizes the packet loss typical of Internet connections.
+ 在可靠的 IP （通常是本地）网络上低延迟视频传输，通常采用 MPEG-TS [ISO13818-1] 单播或多播流的形式，使用 UDP/RTP 协议，其中任何数据包丢失都可以通过启用前向纠错来缓解(FEC)。在不同城市、国家甚至大洲的站之间实现相同的低延迟更具有挑战性。虽然可以使用卫星链路或专用 MPLS [RFC3031] 网络，但这些都是昂贵的解决方案。使用公共 Internet 连接虽然成本较低，但会增加大量带宽开销，用以实现必要的丢包恢复水平。为丢包恢复引入选择性包重传（可靠的 UDP）消除了这些限制。
 
-   To achieve low latency streaming, SRT had to address timing issues. The characteristics of a stream from a source network are completely changed by transmission over the public Internet, which introduces delays, jitter, and packet loss.  This, in turn, leads to problems with decoding, as the audio and video decoders do not receive packets at the expected times.  The use of large buffers helps, but latency is increased.  SRT includes a mechanism to keep a constant end-to-end latency, thus recreating the signal characteristics on the receiver side, and reducing the need for buffering.
+SRT 源自基于 UDP的(UDT) 协议 [GHG04b]，是一种用户级协议，保留了大部分核心概念和机制，同时引入了一些改进和增强，包括控制包修改、改进的流控制以处理实时流、增强的拥塞控制和加密数据包的机制。
 
-   Like TCP, SRT employs a listener/caller model.  The data flow is bi-directional and independent of the connection initiation - either the sender or receiver can operate as listener or caller to initiate a connection.  The protocol provides an internal multiplexing mechanism, allowing multiple SRT connections to share the same UDP port, providing access control functionality to identify the caller on the listener side.
+SRT 是一种传输协议，可在不可预测的网络（例如 Internet）上安全、可靠地传输数据。虽然任何数据类型都可通过 SRT 来传输，但它是低延迟（亚秒级）视频流的理想选择。与 RTMP 相比，SRT 提供了更高的带宽利用率，在长距离连接上允许更高的贡献比特率。
 
-   Supporting forward error correction (FEC) and selective packet retransmission (ARQ), SRT provides the flexibility to use either of the two mechanisms or both combined, allowing for use cases ranging from the lowest possible latency to the highest possible reliability.
+当数据包从源流向目标时，SRT 会检测并适应两个端点之间的实时网络状况，并有助于补偿由于嘈杂网络拥塞导致的抖动和带宽波动。它的错误恢复机制最大限度地减少了 Internet 连接中典型的数据包丢失。
 
-   SRT maintains the ability for fast file transfers introduced in UDT, and adds support for AES encryption.
+为了实现低延迟流式传输，SRT 必须解决时序问题。来自源网络的流特性在通过公共 Internet 传输时会完全改变，这会引入延迟、抖动和数据包丢失。这反过来又会导致解码问题，因为音频和视频解码器不能在预期的时间接收数据包。使用大缓冲区会有所帮助，但会增加延迟。SRT 包括一种机制来保持恒定的端到端延迟，并在接收端重新创建信号特征，并减少对缓冲的需求。
 
-# 2.  Terms and Definitions
+与 TCP 一样，SRT 采用侦听器Listener/调用者Caller模型。数据流是双向的，并且独立于连接发起——发送者或接收者都可以作为监听者或调用者来发起连接。该协议提供内部多路复用机制，允许多个 SRT 连接共享同一个 UDP 端口，提供访问控制功能以在侦听器端识别调用者Caller。
 
-   The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in BCP 14 [RFC2119] [RFC8174] when, and only when, they appear in all capitals, as shown here.
+SRT 支持前向纠错 (FEC) 和选择性数据包重传 (ARQ)，提供了使用这两种机制中的任何一种或两者结合使用的灵活性，允许使用从最低延迟到最高可靠性的用例。
 
-   SRT:  The Secure Reliable Transport protocol described by this document.
+SRT 保留了 UDT 中引入的快速文件传输能力，并增加了对 AES 加密的支持。
 
-   PRNG:  Pseudo-Random Number Generator.
+# 2. 术语和定义
 
-# 3.  Packet Structure
+关键词“必须”、“不得”、“要求”、“应”、“不得”、“应该”、“不应”、“推荐”、“不推荐”、“可以”和“可选”当且仅当它们以全部大写字母出现时，本文档中的 " 将按照 BCP 14 [RFC2119] [RFC8174] 中的描述进行解释，如此处所示。
 
-   SRT packets are transmitted as UDP payload [RFC0768].  Every UDP packet carrying SRT traffic contains an SRT header immediately after the UDP header (Figure 1).
+- SRT：本文档描述的安全可靠传输协议。
+- PRNG：伪随机数生成器。
+
+# 3. 数据包结构
+
+SRT 数据包作为 UDP 有效负载 [RFC0768] 来传输。每个承载 SRT 流量的 UDP 数据包，在 UDP 报头后都有一个 SRT 报头（图 1）。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -102,10 +95,10 @@ Expires: 13 March 2021                                           J. Dube
 
                     Figure 1: SRT packet as UDP payload
 ```
-   SRT has two types of packets distinguished by the Packet Type Flag:
-   data packet and control packet.
+   SRT 有两种类型的数据包，由数据包类型标志区分：
+   数据包和控制包。
 
-   The structure of the SRT packet is shown in Figure 2.
+   SRT 数据包结构如图 2 所示。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -127,17 +120,15 @@ Expires: 13 March 2021                                           J. Dube
                        Figure 2: SRT packet structure
 ```
 
-   F: 1 bit.  Packet Type Flag.  The control packet has this flag set to "1".  The data packet has this flag set to "0".
+- F：1位。数据包类型标志。
+  - 控制包将此标志设置为“1”。
+  - 数据包将此标志设置为“0”。
+- Timestamp: 32 位。数据包的时间戳，以微秒为单位。该值与建立 SRT 连接的时间有关。根据传输模式（第 4.2 节），该字段存储数据包发送时间或数据包起始时间。
+- Destination Socket ID: 32 位。一个固定宽度的字段，提供应向其分派数据包的 SRT 套接字 ID。当数据包是连接请求时，该字段可能具有特殊值“0”。
 
-   Timestamp: 32 bits.  The timestamp of the packet, in microseconds.
-      The value is relative to the time the SRT connection was established.  Depending on the transmission mode (Section 4.2),
-      the field stores the packet send time or the packet origin time.
+## 3.1 数据包
 
-   Destination Socket ID: 32 bits.  A fixed-width field providing the SRT socket ID to which a packet should be dispatched.  The field may have the special value "0" when the packet is a connection request.
-
-## 3.1.  Data Packets
-
-   The structure of the SRT data packet is shown in Figure 3.
+   SRT数据包结构如图3所示。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -157,28 +148,29 @@ Expires: 13 March 2021                                           J. Dube
 
                       Figure 3: Data packet structure
 ```
-   Packet Sequence Number: 31 bits.  The sequential number of the data
-      packet.
+  - Packet Sequence Number：31 位。数据包序号。
+  - PP：2 位。数据包位置标志。该字段指示数据包在消息中的位置。
+    * “10b”（二进制）表示消息的第一个数据包。
+    * “00b” 表示中间的包。
+    * “01b” 表示最后一个数据包。
+    * 如果单个数据包形成整个消息，则值为“11b”。
+  - O：1位。有序标志。指示消息是否应该由接收者按顺序传递(1) 或不 (0) 。某些限制取决于所使用的数据传输模式（第 4.2 节）。
+  - KK：2位。基于密钥的加密标志。标志位指示数据是否被加密。
+    * “00b”（二进制）表示数据未加密。
+    * “01b” 表示用偶数密钥加密数据，
+    * “10b” 用于奇数密钥加密。请参阅第 5 节。
+    * “11b” 仅用于控制包。
+  - R：1位。重传数据包标志。
+    * 当第一次发送数据包时，该标志是清除的。
+    * 当重新发送数据包时，该标志设置为“1”。
+  - Message Number: 26 位。形成消息的连续数据包的连续数（见 PP 字段）。
+  - Timestamp: 32 位。见第 3 节。
+  - Destination Socket ID: 32 位。见第 3 节。
+  - Data：可变长度。数据包的有效载荷。数据的长度是UDP数据包的剩余长度。
 
-   PP: 2 bits.  Packet Position Flag.  This field indicates the position of the data packet in the message.  The value "10b" (binary) means the first packet of the message. "00b" indicates a packet in the middle. "01b" designates the last packet.  If a single data packet forms the whole message, the value is "11b".
+## 3.2 控制包
 
-   O: 1 bit.  Order Flag.  Indicates whether the message should be delivered by the receiver in order (1) or not (0).  Certain restrictions apply depending on the data transmission mode used (Section 4.2).
-
-   KK: 2 bits.  Key-based Encryption Flag.  The flag bits indicate whether or not data is encrypted.  The value "00b" (binary) means data is not encrypted. "01b" indicates that data is encrypted with an even key, and "10b" is used for odd key encryption.  Refer to Section 5.  The value "11b" is only used in control packets.
-
-   R: 1 bit.  Retransmitted Packet Flag.  This flag is clear when a packet is transmitted the first time.  The flag is set to "1" when a packet is retransmitted.
-
-   Message Number: 26 bits.  The sequential number of consecutive data packets that form a message (see PP field).
-
-   Timestamp: 32 bits.  See Section 3.
-
-   Destination Socket ID: 32 bits.  See Section 3.
-
-   Data: variable length.  The payload of the data packet.  The length of the data is the remaining length of the UDP packet.
-
-## 3.2.  Control Packets
-
-   An SRT control packet has the following structure.
+   SRT 控制包具有以下结构。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -198,20 +190,14 @@ Expires: 13 March 2021                                           J. Dube
 
                      Figure 4: Control packet structure
 ```
-   Control Type: 15 bits.  Control Packet Type.  The use of these bits is determined by the control packet type definition.  See Table 1.
+- Control Type:  15 位。控制包类型。详见表 1。
+- Subtype: 16 位。此字段指定特定数据包的附加子类型。见表 1。
+- Type-specific Information：32 位。该字段的使用取决于特定的控制包类型。握手包不使用该字段。
+- Timestamp: 32 位。见第 3 节。
+- Destination Socket ID: 32 位。见第 3 节。
+- 控制信息字段 (CIF)：可变长度。该字段的使用由控制包的Control Type字段定义。
 
-   Subtype: 16 bits.  This field specifies an additional subtype for specific packets.  See Table 1.
-
-
-   Type-specific Information: 32 bits.  The use of this field depends on the particular control packet type.  Handshake packets do not use this field.
-
-   Timestamp: 32 bits.  See Section 3.
-
-   Destination Socket ID: 32 bits.  See Section 3.
-
-   Control Information Field (CIF): variable length.  The use of this field is defined by the Control Type field of the control packet.
-
-   The types of SRT control packets are shown in Table 1.  The value "0x7FFF" is reserved for a user-defined type.
+   SRT控制包的类型如表1所示。值“0x7FFF”是为用户定义的类型保留的。
 
 | Packet Type       | Control Type | Subtype | Section       |
 |-------------------|--------------|---------|---------------|
@@ -223,16 +209,16 @@ Expires: 13 March 2021                                           J. Dube
 | ACKACK            |    0x0006    |   0x0   | Section 3.2.7 |
 | User-Defined Type |    0x7FFF    |    -    | N/A           |
 
-                    Table 1: SRT Control Packet Types
+                    表 1：SRT 控制包类型
 
-### 3.2.1.  Handshake
+### 3.2.1 Handshake
 
-   Handshake control packets (Control Type = 0x0000) are used to exchange peer configurations, to agree on connection parameters, and to establish a connection.
+   握手控制包（Control Type = 0x0000）用于交换对等配置、就连接参数达成一致以及建立连接。
 
-   The Control Information Field (CIF) of a handshake control packet is shown in Figure 5.
+   握手控制包的控制信息字段 (CIF) 如图 5 所示。
 
 ```
-    0                   1                   2                   3
+   0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
    |                            Version                            |
@@ -268,11 +254,8 @@ Expires: 13 March 2021                                           J. Dube
 
                     Figure 5: Handshake packet structure
 ```
-   Version: 32 bits.  A base protocol version number.  Currently used values are 4 and 5.  Values greater than 5 are reserved for future use.
-
-   Encryption Field: 16 bits.  Block cipher family and key size.  The values of this field are described in Table 2.  The default value is AES-128.
-
-
+-  Version：32 位。基本协议版本号。当前使用的值为 4 和 5。大于 5 的值保留供将来使用。
+-  加密字段：16 位。分组密码族和密钥大小。该字段的值在表 2 中描述。默认值为 AES-128。
 
 | Value | Cipher family and key size |
 |------ |----------------------------|
@@ -281,9 +264,11 @@ Expires: 13 March 2021                                           J. Dube
 | 3     |          AES-192           |
 | 4     |          AES-256           |
 
- Table 2: Handshake Encryption Field Values
+ 表 2：握手加密字段值
 
-   Extension Field: 16 bits.  This field is message specific extension related to Handshake Type field.  The value MUST be set to 0 except for the following cases.  (1) If the handshake control packet is the INDUCTION message, this field is sent back by theListener. (2) In the case of a CONCLUSION message, this field value should contain a combination of Extension Type values.  For more details, see Section 4.3.1.
+-  扩展字段：16 位。该字段是与握手类型字段相关的消息特定扩展。除以下情况外，该值必须设置为 0。
+  (1) 如果握手控制包是 INDUCTION 消息，该字段由监听器发回。
+  (2) 在CONCLUSION消息的情况下，该字段值应包含扩展类型值的组合。有关详细信息，请参阅第 4.3.1 节。
 
 | Bitmask    |  Flag  |
 |------------|--------|
@@ -291,16 +276,12 @@ Expires: 13 March 2021                                           J. Dube
 | 0x00000002 | KMREQ  |
 | 0x00000004 | CONFIG |
 
-Table 3: Handshake Extension Flags
+表 3：握手扩展标志
 
-   Initial Packet Sequence Number: 32 bits.  The sequence number of the very first data packet to be sent.
-
-   Maximum Transmission Unit Size: 32 bits.  This value is typically set to 1500, which is the default Maximum Transmission Unit (MTU) size for Ethernet, but can be less.
-
-   Maximum Flow Window Size: 32 bits.  The value of this field is the maximum number of data packets allowed to be "in flight" (i.e. the number of sent packets for which an ACK control packet has not yet been received)
-
-
-   Handshake Type: 32 bits.  This field indicates the handshake packet type.  The possible values are described in Table 4.  For more details refer to Section 4.3.
+-  初始数据包序列号：32 位。要发送的第一个数据包的序列号。
+-  最大传输单元大小：32 位。此值通常设置为 1500，这是以太网的默认最大传输单元 (MTU) 大小，但可以更小。
+-  最大流窗口大小：32 位。该字段的值是允许“in flight”的最大数据包数（即尚未收到 ACK 控制包的已发送数据包数）
+-  握手类型: 32 位。该字段表示握手包类型。可能的值在表 4 中描述。有关详细信息，请参阅第 4.3 节。
 
 | Value      | Handshake type |
 |------------|----------------|
@@ -310,19 +291,15 @@ Table 3: Handshake Extension Flags
 | 0x00000000 |    WAVEHAND    |
 | 0x00000001 |   INDUCTION    |
 
-   Table 4: Handshake Type
+   表 4：握手类型
 
-   SRT Socket ID: 32 bits.  This field holds the ID of the source SRT socket from which a handshake packet is issued.
-
-   SYN Cookie: 32 bits.  Randomized value for processing a handshake. The value of this field is specified by the handshake message type.  See Section 4.3.
-
-   Peer IP Address: 128 bits.  IPv4 or IPv6 address of the packet's sender.  The value consists of four 32-bit fields.  In the case of IPv4 addresses, fields 2, 3 and 4 are filled with zeroes.
-
-   Extension Type: 16 bits.  The value of this field is used to process an integrated handshake.  Each extension can have a pair of request and response types.
-
+-  SRT 套接字 ID：32 位。该字段保存发出握手包的源 SRT 套接字ID。
+-  SYN Cookie：32 位。处理握手的随机值。该字段的值由握手消息类型指定。请参见第 4.3 节。
+-  对端IP地址：128 位。数据包发送者的 IPv4 或 IPv6 地址。该值由四个 32 位字段组成。对于 IPv4 地址，字段 2、3 和 4 用零填充。
+-  扩展类型: 16 位。该字段的值用于处理集成握手。每个扩展都可以有一对请求和响应类型。
 
 | Value |   Extension Type   | HS Extension Flag |
-|-------|--------------------|------------------ |
+|-------|--------------------|-------------------|
 | 1     |   SRT_CMD_HSREQ    |       HSREQ       |
 | 2     |   SRT_CMD_HSRSP    |       HSREQ       |
 | 3     |   SRT_CMD_KMREQ    |       KMREQ       |
@@ -332,17 +309,18 @@ Table 3: Handshake Extension Flags
 | 7     |   SRT_CMD_FILTER   |       CONFIG      |
 | 8     |   SRT_CMD_GROUP    |       CONFIG      |
 
-Table 5: Handshake Extension Type values
+表 5：握手扩展类型值
 
-   Extension Length: 16 bits.  The length of the Extension Contents field in four-byte blocks.
-
-   Extension Contents: variable length.  The payload of the extension.
+- 扩展长度：16 位。以四字节为单位的扩展内容字段的长度。
+- 扩展内容：可变长度。扩展的有效负载。
 
 #### 3.2.1.1.  Handshake Extension Message
 
-   In a Handshake Extension, the value of the Extension Field of the handshake control packet is defined as 1 for a Handshake Extension request (SRT_CMD_HSREQ in Table 5), and 2 for a Handshake Extension response (SRT_CMD_HSRSP in Table 5).
+在握手扩展中，握手控制包的扩展字段的值
+- 对于握手扩展请求（表 5 中的 SRT_CMD_HSREQ）定义为 1，
+- 对于握手扩展响应（表 5 中的 SRT_CMD_HSRSP）定义为 2。
 
-   The Extension Contents field of a Handshake Extension Message is structured as follows:
+   握手扩展消息的扩展内容字段结构如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -357,51 +335,46 @@ Table 5: Handshake Extension Type values
               Figure 6: Handshake Extension Message structure
 ```
 
-   SRT Version: 32 bits.  SRT library version MUST be formed as major * 0x10000 + minor * 0x100 + patch.
-
-   SRT Flags: 32 bits.  SRT configuration flags (see Section 3.2.1.1.1).
-
-   Receiver TSBPD Delay: 16 bits.  Timestamp-Based Packet Delivery (TSBPD) Delay of the receiver.  Refer to Section 4.5.
-
-   Sender TSBPD Delay: 16 bits.  TSBPD of the sender.  Refer to Section 4.5.
+- SRT 版本：32 位。SRT 库版本必须形成为主要 * 0x10000 + 次要 * 0x100 + 补丁。
+- SRT Flags: 32 位。SRT 配置标志（参见第 3.2.1.1.1 节）。
+- 接收器 TSBPD 延迟：16 位。接收器的基于时间戳的数据包传递 (TSBPD) 延迟。请参阅第 4.5 节。
+- 发送方 TSBPD 延迟：16 位。发件人的 TSBPD。请参阅第 4.5 节。
 
 3.2.1.1.1.  Handshake Extension Message Flags
 
-                      | Bitmask    |      Flag     |
-                      |------------|---------------|
-                      | 0x00000001 |    TSBPDSND   |
-                      | 0x00000002 |    TSBPDRCV   |
-                      | 0x00000004 |     CRYPT     |
-                      | 0x00000008 |   TLPKTDROP   |
-                      | 0x00000010 |  PERIODICNAK  |
-                      | 0x00000020 |   REXMITFLG   |
-                      | 0x00000040 |     STREAM    |
-                      | 0x00000080 | PACKET_FILTER |
+| Bitmask    |      Flag     |
+|------------|---------------|
+| 0x00000001 |    TSBPDSND   |
+| 0x00000002 |    TSBPDRCV   |
+| 0x00000004 |     CRYPT     |
+| 0x00000008 |   TLPKTDROP   |
+| 0x00000010 |  PERIODICNAK  |
+| 0x00000020 |   REXMITFLG   |
+| 0x00000040 |     STREAM    |
+| 0x00000080 | PACKET_FILTER |
 
-                            Table 6: Handshake Extension Message Flags
+Table 6: Handshake Extension Message Flags
 
-   *  TSBPDSND flag defines if the TSBPD mechanism (Section 4.5) will be used for sending.
-   *  TSBPDRCV flag defines if the TSBPD mechanism (Section 4.5) will be used for receiving.
-   *  CRYPT flag MUST be set.  It is a legacy flag that indicates the party understands KK field of the SRT Packet (Figure 3).
-   *  TLPKTDROP flag should be set if too-late packet drop mechanism will be used during transmission.  See Section 4.6.
-   *  PERIODICNAK flag set indicates the peer will send periodic NAK packets.  See Section 4.8.2.
-   *  REXMITFLG flag MUST be set.  It is a legacy flag that indicates the peer understands the R field of the SRT DATA Packet (Figure 3).
-   *  STREAM flag identifies the transmission mode (Section 4.2) to be used in the connection.  If the flag is set the buffer mode (Section 4.2.3) will be used.  Otherwise, message mode (Section 4.2.1) is to be used.
-   *  PACKET_FILTER flag indicates if the peer supports packet filter.
+   * TSBPDSND 标志定义是否使用 TSBPD 机制（第 4.5 节）进行发送。
+   * TSBPDRCV 标志定义 TSBPD 机制（第 4.5 节）是否将用于接收。
+   * 必须设置 CRYPT 标志。它是一个遗留标志，表明该方理解 SRT 数据包的 KK 字段（图 3）。
+   * TLPKTDROP 标志应该被设置，如果太迟丢包机制将在传输过程中使用。请参见第 4.6 节。
+   * PERIODICNAK 标志设置表示对等方将定期发送 NAK 数据包。请参见第 4.8.2 节。
+   * 必须设置 REXMITFLG 标志。这是一个传统标志，表明对等方理解 SRT 数据包的 R 字段（图 3）。
+   * STREAM 标志标识要在连接中使用的传输模式（第 4.2 节）。如果设置了标志，将使用缓冲模式（第 4.2.3 节）。否则，将使用消息模式（第 4.2.1 节）。
+   * PACKET_FILTER 标志表明对端是否支持包过滤。
 
 #### 3.2.1.2.  Key Material Extension Message
 
-   If an encrypted connection is being established, the Key Material (KM) is first transmitted as a Handshake Extension message.  This extension is not supplied for unprotected connections.  The purpose of the extension is to let peers exchange and negotiate encryption-related information to be used to encrypt and decrypt the payload of the stream.
+   如果正在建立加密连接，则首先将Key Material (KM) 作为握手扩展消息传输。此扩展不提供给未受保护的连接。扩展的目的是让对等方交换和协商用于加密和解密流的有效负载的加密相关信息。
 
-   The extension can be supplied with the Handshake Extension Type field set to either SRT_CMD_KMREQ or SRT_CMD_HSRSP (see Table 5 in Section 3.2.1).  For more details refer to Section 4.3.
-    The KM message is placed in the Extension Contents.  See Section 3.2.2 for the structure of the KM message.
+   可以通过设置为 SRT_CMD_KMREQ 或 SRT_CMD_HSRSP 的握手扩展类型字段来提供扩展（参见第 3.2.1 节中的表 5）。有关详细信息，请参阅第 4.3 节。
+    KM 消息放置在扩展内容中。KM 消息的结构见第 3.2.2 节。
 
 #### 3.2.1.3.  Stream ID Extension Message
 
-   The Stream ID handshake extension message can be used to identify the stream content.  The Stream ID value can be free-form, but there is also a recommended convention that can be used to achieve interoperability.
-
-   The Stream ID handshake extension message has SRT_CMD_SID extension type (see Table 5.  The extension contents are a sequence of UTF-8 characters.  The maximum allowed size of the StreamID extension is 512 bytes.
-
+   Stream ID 握手扩展消息可用于识别流内容。Stream ID 值可以是自由格式，但也有一个可用于实现互操作性的推荐约定。
+   Stream ID 握手扩展消息具有 SRT_CMD_SID 扩展类型（见表 5。扩展内容为 UTF-8 字符序列。StreamID 扩展允许的最大大小为 512 字节。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -414,13 +387,13 @@ Table 5: Handshake Extension Type values
 
                    Figure 7: Stream ID Extension Message
 ```
-   The Extension Contents field holds a sequence of UTF-8 characters (see Figure 7).  The maximum allowed size of the StreamID extension is 512 bytes.  The actual size is determined by the Extension Length field (Figure 5), which defines the length in four byte blocks.  If the actual payload is less than the declared length, the remaining bytes are set to zeros.
+   Extension Contents 字段包含一个 UTF-8 字符序列（参见图 7）。StreamID 扩展允许的最大大小为 512 字节。实际大小由扩展长度字段（图 5）确定，该字段定义了四个字节长度。如果实际有效负载小于声明长度，则剩余字节设置为零。
 
-   The content is stored as 32-bit little endian words.
+   内容存储为 32 位小端字。
 
 #### 3.2.1.4.  Group Membership Extension
 
-   The Group Membership handshake extension is used to distinguish single SRT connections and bonded SRT connections (group connections).
+   组成员握手扩展用于区分单个 SRT 连接和绑定 SRT 连接（组连接）。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -432,48 +405,42 @@ Table 5: Handshake Extension Type values
 
                 Figure 8: Group Membership Extension Message
 ```
-   GroupID: 32 bits.  The identifier of a group whose members include the sender socket that is making a connection.  The target socket that should interpret it should belong to the corresponding group on its side (or should create one, if it doesn't exist).
+- GroupID：32 位。组标识符，其成员包括正在建立连接的发送方套接字。应该解释它的目标套接字应该属于其一侧的相应组（或者应该创建一个，如果它不存在）。
+- Type: 8 位。组类型，根据 SRT_GTYPE_ 枚举。
+   * 0：未定义的组类型，
+   * 1：广播组类型，
+   * 2：主/备份组类型
+   * 3：平衡组类型（保留以备将来使用）
+   * 4：多播组类型（保留以备将来使用）
 
-   Type: 8 bits.  Group type, as per SRT_GTYPE_ enumeration.
-
-   *  0: undefined group type,
-   *  1: broadcast group type,
-   *  2: main/backup group type
-   *  3: balancing group type (reserved for future use)
-   *  4: multicast group type (reserved for future use)
-
-   Flags: 8 bits.  Special flags mostly reserved for the future.  See Figure 9.
-
-   Weight: 16 bits.  Special value with interpretation depending on the Type field value.
-
-   *  Not used with broadcast groups.
-   *  Defines the link priority in backup groups.
-   *  Not yet defined (reserved for future) for any other cases.
+- Flags: 8 位。主要为未来保留的特殊标志。请参见下图
+  * M：1位。设置时，定义消息编号的同步，否则传输在序列号上同步。
 ```
     0 1 2 3 4 5 6 7
    +-+-+-+-+-+-+-+
    |   (zero)  |M|
    +-+-+-+-+-+-+-+
 ```
-                 Figure 9: Group Membership Extension Flags
 
-   M: 1 bit.  When set, defines synchronization on message numbers, otherwise transmission is synchronized on sequence numbers.
+- Weight：16 位。特殊值的解释取决于类型字段值。
+   * 不适用于广播组。
+   * 定义备份组中的链路优先级。
+   * 对于任何其他情况，尚未定义（留待将来使用）。
 
-### 3.2.2.  Key Material
 
-   The purpose of the Key Material Message is to let peers exchange encryption-related information to be used to encrypt and decrypt the payload of the stream.
+### 3.2.2 Key Material
 
-   This message can be supplied in two possible ways:
+   Key Material消息的目的是让对等方交换与加密相关信息，以用于加密和解密流的有效负载。
 
-   *  as a Handshake Extension, see Section 3.2.1.2,
-   *  in the Content Information Field of the User-Defined control packet (described below).
+   可通过两种方式提供此消息：
+   * 作为握手扩展，请参阅第 3.2.1.2 节，
+   * 在用户定义的控制包的内容信息字段中（如下所述）。
 
-   When the Key Material is transmitted as a control packet, the Control Type field of the SRT packet header is set to User-Defined Type (see Table 1), the Subtype field of the header is set to SRT_CMD_KMREQ for key-refresh request and SRT_CMD_KMRSP for key-refresh response (Table 5).  The KM Refresh mechanism is described in Section 5.1.6.
+   当 Key Material 作为控制包传输时，SRT 包头的 Control Type 字段设置为 User-Defined Type（见表 1），包头的 Subtype 字段设置为 SRT_CMD_KMREQ 用于密钥刷新请求和 SRT_CMD_KMRSP用于键刷新响应（表 5）。KM 刷新机制在第 5.1.6 节中描述。
 
-   The structure of the Key Material message is illustrated in Figure 10.
+   Key Material消息结构如图 10 所示。
 
 ```
-
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
@@ -494,55 +461,47 @@ Table 5: Handshake Extension Type values
 
                  Figure 10: Key Material Message structure
 ```
-   S: 1 bit, value = {0}.  This is a fixed-width field that is reserved for future usage.
+  - S：1 位，值 = {0}。这是一个固定宽度的字段，保留供将来使用。
+  - 版本 (V)：3 位，值 = {1}。这是一个固定宽度的字段，指示 SRT 版本：
+      * 1：初始版本
 
-   Version (V): 3 bits, value = {1}.  This is a fixed-width field that indicates the SRT version:
+  - 包类型 (PT)：4 位，值 = {2}。这是指示数据包类型的固定宽度字段：
+      * 0：保留
+      * 1：媒体流消息（MSmsg）
+      * 2：Key Material消息（KMmsg）
+      * 7：保留用于区分 MPEG-TS 数据包（0x47=同步字节）
 
-      *  1: initial version
+  - Sign：16 位，值 = {0x2029}。这是一个固定宽度的字段，包含编码为 PnP 供应商 ID ([PNPID]) 的签名“HAI”（按大端顺序）
+  - Resv1：6 位，值 = {0}。这是为标志扩展或其他用途保留的固定宽度字段。
+  - Key-based Encryption (KK)：2 位。这是一个固定宽度的字段，指示扩展中提供了哪些 SEK（奇数和/或偶数）：
+      * 00b：没有提供 SEK（无效的扩展格式）
+      * 01b：提供偶数键
+      * 10b：提供奇数键
+      * 11b：提供偶数和奇数键
 
-   Packet Type (PT): 4 bits, value = {2}.  This is a fixed-width field that indicates the Packet Type:
+   - Key Encryption Key Index (KEKI)：32 位，值 = {0}。这是用于指定 KEK 索引（大端顺序）的固定宽度字段，用于包装（和可选地验证）SEK。值 0 用于表示当前流的默认键。
+      保留其他值以供将来可能使用密钥管理系统检索加密上下文。
+      * 0：默认流关联键（流/系统默认）
+      * 1..255：为手动索引键保留
 
-      *  0: Reserved
-      *  1: Media Stream Message (MSmsg)
-      *  2: Keying Material Message (KMmsg)
-      *  7: Reserved to discriminate MPEG-TS packet (0x47=sync byte)
+   - Cipher：8 位，值 = {0..2}。这是用于指定加密密码和模式的固定宽度字段：
+      * 0：无或 KEKI 索引加密上下文
+      * 2：AES-CTR [SP800-38A]
 
-   Sign: 16 bits, value = {0x2029}.  This is a fixed-width field that contains the signature 'HAI' encoded as a PnP Vendor ID ([PNPID]) (in big-endian order)
+   - 身份验证 (Auth)：8 位，值 = {0}。这是用于指定消息验证码算法的固定宽度字段：
+      * 0：无或 KEKI 索引加密上下文
 
-   Resv1: 6 bits, value = {0}.  This is a fixed-width field reserved for flag extension or other usage.
+   - 流封装 (SE)：8 位，值 = {2}。这是一个用于描述流封装的固定宽度字段：
+      * 0：未指定或 KEKI 索引的加密上下文
+      * 1：MPEG-TS/UDP
+      * 2：MPEG-TS/SRT
 
-   Key-based Encryption (KK): 2 bits.  This is a fixed-width field that indicates which SEKs (odd and/or even) are provided in the extension:
-      *  00b: no SEK is provided (invalid extension format)
-      *  01b: even key is provided
-      *  10b: odd key is provided
-      *  11b: both even and odd keys are provided
-
-   Key Encryption Key Index (KEKI): 32 bits, value = {0}.  This is a fixed-width field for specifying the KEK index (big-endian order) was used to wrap (and optionally authenticate) the SEK(s).  The value 0 is used to indicate the default key of the current stream.
-      Other values are reserved for the possible use of a key management system in the future to retrieve a cryptographic context.
-      *  0: Default stream associated key (stream/system default)
-      *  1..255: Reserved for manually indexed keys
-
-   Cipher: 8 bits, value = {0..2}.  This is a fixed-width field for specifying encryption cipher and mode:
-      *  0: None or KEKI indexed crypto context
-      *  2: AES-CTR [SP800-38A]
-
-   Authentication (Auth): 8 bits, value = {0}.  This is a fixed-width field for specifying a message authentication code algorithm:
-      *  0: None or KEKI indexed crypto context
-
-   Stream Encapsulation (SE): 8 bits, value = {2}.  This is a fixed-width field for describing the stream encapsulation:
-
-      *  0: Unspecified or KEKI indexed crypto context
-      *  1: MPEG-TS/UDP
-      *  2: MPEG-TS/SRT
-
-   Resv2: 8 bits, value = {0}.  This is a fixed-width field reserved for future use.
-   Resv3: 16 bits, value = {0}.  This is a fixed-width field reserved for future use.
-   SLen/4: 8 bits, value = {4}.  This is a fixed-width field for specifying salt length SLen in bytes divided by 4.  Can be zero if no salt/IV present.  The only valid length of salt defined is 128 bits.
-   KLen/4: 8 bits, value = {4,6,8}.  This is a fixed-width field for specifying SEK length in bytes divided by 4.  Size of one key even if two keys present.  MUST match the key size specified in the Encryption Field of the handshake packet Table 2.
-
-   Salt (SLen): SLen * 8 bits, value = { }.  This is a variable-width field that complements the keying material by specifying a salt key.
-
-   Wrap: (64 + n * KLen * 8) bits, value = { }.  This is a variable-width field for specifying Wrapped key(s), where n = (KK + 1)/2 and the size of the wrap field is ((n * KLen) + 8) bytes.
+   - Resv2：8 位，值 = {0}。这是一个固定宽度的字段，保留供将来使用。
+   - Resv3：16 位，值 = {0}。这是一个固定宽度的字段，保留供将来使用。
+   - SLen/4：8 位，值 = {4}。这是一个固定宽度字段，用于指定Salt长度 SLen（以字节为单位）除以 4。如果不存在Salt/- IV，则可以为零。定义的Salt的唯一有效长度是 128 位。
+   - Klen/4：8 位，值 = {4,6,8}。这是一个固定宽度字段，用于指定 SEK 长度（以字节为单位除以 4）。即使存在两个密钥，一个密钥的大小。必须与握手包表 2 的加密字段中指定的密钥大小相匹配。
+   - Salt（SLen）：SLen * 8 位，值 = { }。这是一个可变宽度字段，通过指定Salt键来补充键控材料。
+   - Wrap：(64 + n * KLen * 8) 位，值 = { }。这是用于指定 Wrapped key(s) 的可变宽度字段，其中 n = (KK + 1)/2 且 wrap 字段的大小为 ((n * KLen) + 8) 字节。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -558,21 +517,19 @@ Table 5: Handshake Extension Type values
 
                      Figure 11: Unwrapped key structure
 ```
-   ICV: 64 bits.  64-bit Integrity Check Vector(AES key wrap integrity). This field is used to detect if the keys were unwrapped properly. If the KEK in hand is invalid, validation fails and unwrapped keys are discarded.
+   - ICV：64 位。64 位完整性检查向量（AES 密钥包装完整性）。该字段用于检测密钥是否被正确解包。如果手中的 KEK 无效，则验证失败并丢弃未包装的密钥。
+   - xSEK：可变宽度。此字段标识奇数或偶数 SEK。如果只存在一个密钥，则在 KK 字段中设置的位会告知提供了哪个 SEK。如果两个键都存在，则此字段为 eSEK（偶数键），其后是奇数键 oSEK。该字段的长度计算为 KLen * 8。
 
-   xSEK: variable width.  This field identifies an odd or even SEK.  If only one key is present, the bit set in the KK field tells which SEK is provided.  If both keys are present, then this field is eSEK (even key) and it is followed by odd key oSEK.  The length of this field is calculated as KLen * 8.
-
-   oSEK: variable width.  This field with the odd key is present only when the message carries the two SEKs (identified by he KK field).
-
+   - oSEK：可变宽度。只有当消息携带两个 SEK（由他的 KK 字段标识）时，才会出现这个带有奇数键的字段。
 
 
 ### 3.2.3.  Keep-Alive
 
-   Keep-alive control packets are sent after a certain timeout from the last time any packet (Control or Data) was sent.  The purpose of this control packet is to notify the peer to keep the connection open when no data exchange is taking place.
+   自上次发送任何数据包（控制或数据）后的某个超时后，将发送保活控制包。此控制包的目的是通知对等方在没有数据交换时，保持连接打开。
 
-   The default timeout for a keep-alive packet to be sent is 1 second.
+   发送保活数据包的默认超时为 1 秒。
 
-   An SRT keep-alive packet is formatted as follows:
+   SRT 保活数据包格式如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -588,21 +545,19 @@ Table 5: Handshake Extension Type values
 
                     Figure 12: Keep-Alive control packet
 ```
-   Packet Type: 1 bit, value = 1.  The packet type value of a keep-alive control packet is "1".
-   Control Type: 15 bits, value = KEEPALIVE{0x0001}.  The control type value of a keep-alive control packet is "1".
-   Reserved: 16 bits, value = 0.  This is a fixed-width field reserved for future use.
-   Type-specific Information.  This field is reserved for future definition.
-   Timestamp: 32 bits.  See Section 3.
-   Destination Socket ID: 32 bits.  See Section 3.
-   Keep-alive controls packet do not contain Control Information Field(CIF).
+- Control Type:  15 位，值 = KEEPALIVE{0x0001}。保活控制包的Control Type值为“1”。
+- Reserved：16 位，值 = 0。这是为将来使用保留的固定宽度字段。
+- Type-specific Information.。该字段保留供将来定义。
+- Timestamp: 32 位。见第 3 节。
+- Destination Socket ID: 32 位。见第 3 节。
 
+ Keep-Alive控制包不包含控制信息字段（CIF）。
 
+### 3.2.4 ACK（确认）
 
-### 3.2.4.  ACK (Acknowledgment)
+   确认控制包用于提供数据包的传递状态。通过确认数据包的接收直到（知道）确认的数据包序列号，接收方通知发送方所有先前的数据包都已收到，或者，在实时传输模式（第 4.2.2 节）下，如果有任何丢失的数据包被丢弃，则为时已晚交付。
 
-   Acknowledgment control packets are used to provide delivery status of data packets.  By acknowled reception of data packets up to the acknowledged packet sequence number the receiver notifies the sender that all prior packets were received or, in case of live transmission mode (Section 4.2.2), preceeeding missing packets if any were dropped as too late to be delivered.
-
-   ACK packets may also carry some additional information from the receiver like RTT, bandwidth, receiving speed, etc.  The CIF portion of the ACK control packet is expanded as follows:
+   ACK 包还可能携带一些来自接收方的附加信息，如 RTT、带宽、接收速度等。ACK 控制包的 CIF 部分扩展如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -632,46 +587,33 @@ Table 5: Handshake Extension Type values
 
                        Figure 13: ACK control packet
 ```
-   Packet Type: 1 bit, value = 1.  The packet type value of an ACK control packet is "1".
+ - Control Type:  15 位，值 = ACK{0x0002}。ACK控制包的Control Type值为“2”。
+ - Reserved：16 位，值 = 0。这是为将来使用保留的固定宽度字段。
+ - Acknowledgement Number：32 位。该字段包含从 1 开始的Full Ack包的序号。
+ - Timestamp: 32 位。见第 3 节。
+ - Destination Socket ID: 32 位。见第 3 节。
+ - Last Acknowledged Packet Sequence Number：32 位。该字段包含被确认的最后一个数据包的序列号加一。换句话说，它是第一个未确认数据包的序列号。
+ - RTT：32 位。RTT 值，以微秒为单位，由接收器根据先前的 ACK-ACKACK 数据包交换估计。
+ - RTT 方差：32 位。RTT 估计的方差，以微秒为单位。
+ - 可用缓冲区大小：32 位。接收方缓冲区的可用大小，以数据包为单位。
+ - 数据包接收速率：32 位。接收数据包的速率，以每秒数据包为单位。
+ - 估计的链路容量：32 位。链路的估计带宽，以每秒数据包为单位。
+ - 接收速率：32 位。估计的接收速率，以每秒字节数为单位。
 
-   Control Type: 15 bits, value = ACK{0x0002}.  The control type value of an ACK control packet is "2".
+   ACK包有几种Type: 
+   * 每 10 ms 发送一个Full ACK 控制包，并具有图 13 上的所有字段。
+   * Lite ACK 控制包仅包含 Last Acknowledged Packet Sequence Number 字段。Acknowledgement Number 字段应设置为 0。
+   * Small ACK 包括直到可用缓冲区大小字段并包括在内的字段。Acknowledgement Number字段应设置为 0。
 
-   Reserved: 16 bits, value = 0.  This is a fixed-width field reserved for future use.
+   发送方仅确认收到Full ACK 数据包（参见 ACKACK 第 3.2.7 节）。
 
-   Acknowledgement Number: 32 bits.  This field contains the sequential number of the full acknowledgment packet starting from 1.
-
-   Timestamp: 32 bits.  See Section 3.
-
-   Destination Socket ID: 32 bits.  See Section 3.
-
-   Last Acknowledged Packet Sequence Number: 32 bits.  This field contains the sequence number of the last data packet being acknowledged plus one.  In other words, if it the sequence number of the first unacknowledged packet.
-
-   RTT: 32 bits.  RTT value, in microseconds, estimated by the receiver based on the previous ACK-ACKACK packet exchange.
-
-   RTT Variance: 32 bits.  The variance of the RTT estimation, in microseconds.
-
-   Available Buffer Size: 32 bits.  Available size of the receiver's buffer, in packets.
-
-   Packets Receiving Rate: 32 bits.  The rate at which packets are being received, in packets per second.
-
-   Estimated Link Capacity: 32 bits.  Estimated bandwidth of the link, in packets per second.
-
-   Receiving Rate: 32 bits.  Estimated receiving rate, in bytes per second.
-
-   There are several types of ACK packets:
-   *  A Full ACK control packet is sent every 10 ms and has all the fields of Figure 13.
-   *  A Lite ACK control packet includes only the Last Acknowledged Packet Sequence Number field.  The Type-specific Information field should be set to 0.
-   *  A Small ACK includes the fields up to and including the Available Buffer Size field.  The Type-specific Information field should be set to 0.
-
-   The sender only acknowledges the receipt of Full ACK packets (see ACKACK Section Section 3.2.7).
-
-   The Lite ACK and Small ACK packets are used in cases when the receiver should acknowledge received data packets more often than every 10 ms.  This is usually needed at high data rates.  It is up to the receiver to decide the condition and the type of ACK packet to send (Lite or Small).  The recommendation is to send a Lite ACK for every 64 packets received.
+   Lite ACK 和 Small ACK 数据包用于接收器应比每 10 ms 更频繁地确认接收到的数据包的情况。这通常在高数据速率下需要。由接收方决定要发送的 ACK 数据包的条件和类型（Lite 或 Small）。建议每收到 64 个数据包发送一个 Lite ACK。
 
 ### 3.2.5.  NAK (Loss Report)
 
-   Negative acknowledgment (NAK) control packets are used to signal failed data packet deliveries.  The receiver notifies the sender about lost data packets by sending a NAK packet that contains a list of sequence numbers for those lost packets.
+   否定确认 (NAK) 控制包用于指示数据包传递失败。接收方通过发送包含丢失数据包序列号列表的 NAK 数据包来通知发送方有关丢失数据包的信息。
 
-   An SRT NAK packet is formatted as follows:
+   SRT NAK 数据包的格式如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -695,19 +637,18 @@ Table 5: Handshake Extension Type values
 
                        Figure 14: NAK control packet
 ```
-   Packet Type: 1 bit, value = 1.  The packet type value of a NAK control packet is "1".
-   Control Type: 15 bits, value = NAK{0x0003}.  The control type value of a NAK control packet is "3".
-   Reserved: 16 bits, value = 0.  This is a fixed-width field reserved for future use.
-   Type-specific Information: 32 bits.  This field is reserved for future definition.
-   Timestamp: 32 bits.  See Section 3.
-   Destination Socket ID: 32 bits.  See Section 3.
-   Control Information Field (CIF).  A single value or a range of lost packets sequence numbers.  See packet sequence number coding in  Appendix A.
+ - Control Type:  15 位，值 = NAK{0x0003}。NAK控制包的Control Type值为“3”。
+ - Reserved：16 位，值 = 0。这是为将来使用保留的固定宽度字段。
+ - Type-specific Information：32 位。该字段保留供将来定义。
+ - Timestamp: 32 bits.  See Section 3.
+ - Destination Socket ID: 32 bits.  See Section 3.
+   控制信息字段 (CIF)。单个值或一系列丢失的数据包序列号。参见附录 A 中的分组序列号编码。
 
 ### 3.2.6.  Shutdown
 
-   Shutdown control packets are used to initiate the closing of an SRT connection.
+   关闭控制包用于启动 SRT 连接的关闭。
 
-   An SRT shutdown control packet is formatted as follows:
+   SRT Shutdown包的格式如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -723,20 +664,17 @@ Table 5: Handshake Extension Type values
 
                      Figure 15: Shutdown control packet
 ```
-   Packet Type: 1 bit, value = 1.  The packet type value of a shutdown control packet is "1".
-   Control Type: 15 bits, value = SHUTDOWN{0x0005}.  The control type value of a shutdown control packet is "5".
-   Timestamp: 32 bits.  See Section 3.
-   Destination Socket ID: 32 bits.  See Section 3.
-   Type-specific Information.  This field is reserved for future definition.
-   Shutdown control packets do not contain Control Information Field(CIF).
+  - Control Type:  15 位，值 = SHUTDOWN{0x0005}。关机控制包的Control Type值为“5”。
+  - Timestamp: 32 位。见第 3 节。
+  - Destination Socket ID: 32 位。见第 3 节。
+  - 特定于类型的信息。该字段保留供将来定义。
+   关闭控制包不包含控制信息字段（CIF）。
 
+### 3.2.7  ACKACK
 
+   发送 ACKACK 控制包以确认接收到 Full ACK，并用于接收方计算 RTT。
 
-### 3.2.7.  ACKACK
-
-   ACKACK control packets are sent to acknowledge the reception of a Full ACK, and are used in the calculation of RTT by the receiver.
-
-   An SRT ACKACK Control packet is formatted as follows:
+   SRT ACKACK 控制包的格式如下：
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -752,274 +690,267 @@ Table 5: Handshake Extension Type values
 
                       Figure 16: ACKACK control packet
 ```
-   Packet Type: 1 bit, value = 1.  The packet type value of an ACKACK control packet is "1".
+  - Control Type:  15 位，值 = ACKACK{0x0006}。ACKACK控制包的Control Type值为“6”。
+  - Acknowledgement Number: 此字段包含Full ACK 数据包的确认编号，该 ACKACK 数据包正在确认其接收。
+  - Timestamp: 32 位。见第 3 节。
+  - Destination Socket ID: 32 位。见第 3 节。
 
-   Control Type: 15 bits, value = ACKACK{0x0006}.  The control type value of an ACKACK control packet is "6".
+   ACKACK 控制包不包含控制信息字段（CIF）。
 
-   Acknowledgement Number.  This field contains the Acknowledgement Number of the full ACK packet the reception of which is being acknowledged by this ACKACK packet.
+# 4. SRT数据传输与控制
 
-   Timestamp: 32 bits.  See Section 3.
+   本节介绍与在传输过程中处理控制和数据包相关的关键概念。
 
-   Destination Socket ID: 32 bits.  See Section 3.
+   握手和能力交换完成后，可以通过已建立的连接发送和接收数据包了。为了充分利用 SRT 提供的低延迟和错误恢复特性，发送方和接收方必须按照本节的规定处理连接的控制包、定时器和缓冲区。
 
-   ACKACK control packets do not contain Control Information Field(CIF).
+## 4.1 流复用
 
-# 4.  SRT Data Transmission and Control
+   多个 SRT 套接字可以共享同一个 UDP 套接字，以便接收到此 UDP 套接字的数据包将正确地分派到它们当前指定的那些 SRT 套接字。
 
-   This section describes key concepts related to the handling of control and data packets during the transmission process.
+   在握手期间，双方交换他们的 SRT Socket ID。这些 ID 之后用于每个控制和数据包的目标套接字 ID 字段（见第 3 节）。
 
-   After the handshake and exchange of capabilities is completed, packet data can be sent and received over the established connection.  To fully utilize the features of low latency and error recovery provided by SRT, the sender and receiver must handle control packets, timers, and buffers for the connection as specified in this section.
+## 4.2 数据传输模式
 
-## 4.1.  Stream Multiplexing
+   SRT 主要是为实时流媒体创建的，因此它的主要和默认传输模式是“Live Mode”。但是，SRT 支持原始 UDT 库支持的模式，即Buffer Mode和Message Mode。
 
-   Multiple SRT sockets may share the same UDP socket so that the packets received to this UDP socket will be correctly dispatched to those SRT sockets they are currently destined.
+### 4.2.1 Message Mode
 
-   During the handshake, the parties exchange their SRT Socket IDs. These IDs are then used in the Destination Socket ID field of every control and data packet (see Section 3).
+   当握手扩展消息第 3.2.1.1 节的 STREAM 标志设置为 0 时，协议工作在消息模式，其特征如下：
 
-## 4.2.  Data Transmission Modes
+   * 每个数据包都有自己的数据包序列号。
+   * 一个或几个连续的 SRT 数据包可以形成一个消息。
+   * 属于同一消息的所有数据包在消息编号字段中设置了相同的消息编号。
 
-   SRT has been mainly created for Live Streaming and therefore its main and default transmission mode is "live".  SRT supports, however, the modes that the original UDT library supported, that is, buffer and message transmission.
+   消息的第一个数据包的数据包位置标志（第 3.1 节）的第一位设置为 1。消息的最后一个数据包的数据包位置标志的第二位设置为 1。因此，PP等于“11b”表示形成整个消息的分组。PP等于“00b”表示属于消息内部的分组。
 
-### 4.2.1.  Message Mode
+   SRT 中消息的概念来自 UDT ([GHG04b])。在这种模式下，一条发送指令恰好传递一条有边界的数据（一条消息）。此消息可能跨越多个 UDP/SRT 数据包。唯一的大小限制是它应该作为一个整体适合发送者和接收者的缓冲区。尽管在内部对数据包的所有操作（例如ACK、NAK）都是独立执行的，但应用程序必须发送和接收整个消息。在消息完成（收到所有数据包）之前，不允许应用程序读取它。
 
-   When the STREAM flag of the handshake Extension Message Section 3.2.1.1 is set to 0, the protocol operates in Message mode, characterized as follows:
+   当数据包的 Order Flag 设置为 1 时，这会对消息施加顺序读取限制。设置为 0 的 Order Flag 允许应用程序在可能丢失某些数据包的任何先前消息之前，读取已经完全可用的消息（乱序读取）。
 
-   *  Every packet has its own Packet Sequence Number.
-   *  One or several consecutive SRT Data packets can form a message.
-   *  All the packets belonging to the same message have a similar message number set in the Message Number field.
+### 4.2.2 Live Mode
 
-   The first packet of a message has the first bit of the Packet Position Flags (Section 3.1) set to 1.  The last packet of the message has the second bit of the Packet Position Flags set to 1.
-   Thus, a PP equal to "11b" indicates a packet that forms the whole message.  A PP equal to "00b" indicates a packet that belongs to the inner part of the message.
+   实时模式是一种特殊类型的消息模式，其中只允许 PP 字段设置为“11b”的数据包。
 
-   The concept of the message in SRT comes from UDT ([GHG04b]).  In this mode a single sending instruction passes exactly one piece of data that has boundaries (a message).  This message may span across multiple UDP packets (and multiple SRT data packets).  The only size limitation is that it shall fit as a whole in the buffers of the sender and the receiver.  Although internally all operations (e.g.ACK, NAK) on data packets are performed independently, an application must send and receive the whole message.  Until the message is complete (all packets are received) the application will not be allowed to read it.
+   此外，在此模式下使用基于时间戳的数据包传递 (TSBPD)（第 4.5 节）和Too late的数据包丢弃（第 4.6 节）机制。
 
-   When the Order Flag of a Data packet is set to 1, this imposes a sequential reading order on messages.  An Order Flag set to 0 allows an application to read messages that are already fully available, before any preceding messages that may have some packets missing.
+### 4.2.3 Buffer Mode
 
-### 4.2.2.  Live Mode
+   通过将握手扩展消息标志的 STREAM 标志设置为 1，在握手期间协商缓冲区模式。
 
-   Live mode is a special type of message mode where only data packets with their PP field set to "11b" are allowed.
+   在这种模式下，连续的数据包形成一个可以读取的连续流，能读取任意大小部分。
 
-   Additionally Timestamp-Based Packet Delivery (TSBPD) (Section 4.5) and Too-Late Packet Drop (Section 4.6) mechanisms are used in this mode.
+## 4.3 握手消息
 
-### 4.2.3.  Buffer Mode
+   SRT 是一种面向连接的协议。它包含“连接”和“会话”的概念。SRT 使用 UDP 系统协议来发送数据和控制包。
 
-   Buffer mode is negotiated during the Handshake by setting the STREAM flag of the handshake Extension Message Flags to 1.
+   SRT 连接的特点是：
 
-   In this mode consecutive packets form one continuous stream that can be read, with portions of any size.
+   * 首先参与握手过程；
+   * 只要及时交换任何数据包，就可以保持；
+   * 当一方从对方收到关闭命令（连接被外部主机关闭），或者当它在某个预定义的时间内没收到任何数据包（超时连接中断）时，就认为连接是关闭的。
 
-## 4.3.  Handshake Messages
+   SRT 支持两种连接配置：
 
-   SRT is a connection-oriented protocol.  It embraces the concepts of "connection" and "session".  The UDP system protocol is used by SRT for sending data and control packets.
-
-   An SRT connection is characterized by the fact that it is:
-
-   *  first engaged by a handshake process;
-   *  maintained as long as any packets are being exchanged in a timely manner;
-   *  considered closed when a party receives the appropriate close command from its peer (connection closed by the foreign host), or when it receives no packets at all for some predefined time (connection broken on timeout).
-
-   SRT supports two connection configurations:
-
-   1.  Caller-Listener, where one side waits for the other to initiate a connection
-   2.  Rendezvous, where both sides attempt to initiate a connection
+   1. Caller-Listener，一方等待另一方发起连接
+   2. Rendezvous，双方都尝试发起连接
 
 
-   The handshake is performed between two parties: "Initiator" and "Responder":
+   握手在两方之间执行：“发起者”和“响应者”：
 
-   *  Initiator starts the extended SRT handshake process and sends appropriate SRT extended handshake requests.
-   *  Responder expects the SRT extended handshake requests to be sent by the Initiator and sends SRT extended handshake responses back.
+   * 发起者启动扩展 SRT 握手过程并发送适当的 SRT 扩展握手请求。
+   * 响应者期望发起者发送 SRT 扩展握手请求，并返回 SRT 扩展握手响应。
 
-   There are two basic types of SRT handshake extensions that are exchanged in the handshake:
+   在握手中交换的 SRT 握手扩展有两种基本类型: 
+   * 握手扩展消息交换基本SRT信息；
+   * Key Material Exchange 交换封装的流加密密钥（仅在请求加密时使用）。
+   * Stream ID 扩展交换一些特定于流的信息，应用程序可以使用这些信息来识别传入的流连接。
 
-   *  Handshake Extension Message exchanges the basic SRT information;
-   *  Key Material Exchange exchanges the wrapped stream encryption key(used only if encryption is requested).
-   *  Stream ID extension exchanges some stream-specific information that can be used by the application to identify the incoming stream connection.
+   根据连接模式分配发起者Initiator和响应者Responder角色。
 
-   The Initiator and Responder roles are assigned depending on the connection mode.
+   对于 Caller-Listener 连接：Caller 是 Initiator，Listener 是 Responder。
+   对于 Rendezvous 连接：根据握手期间的初始数据交换，分配发起者和响应者角色。
 
-   For Caller-Listener connections: the Caller is the Initiator, the Listener is the Responder.  For Rendezvous connections: the Initiator and Responder roles are assigned based on the initial data interchange during the handshake.
+   握手结构中的握手类型字段（参见图 5）指示握手消息类型。
 
-   The Handshake Type field in the Handshake Structure (see Figure 5) indicates the handshake message type.
+   Caller-Listener 握手交换具有以下握手类型的顺序：
 
-   Caller-Listener handshake exchange has the following order of Handshake Types:
+   1. Caller to Listener: INDUCTION
+   2. Listener to Caller：INDUCTION（报告cookie）
+   3. Caller to Listener：CONCLUSION（使用之前返回的cookie）
+   4. Listener to Caller：CONCLUSION（确认连接建立）
 
-   1.  Caller to Listener: INDUCTION
-   2.  Listener to Caller: INDUCTION (reports cookie)
-   3.  Caller to Listener: CONCLUSION (uses previously returned cookie)
-   4.  Listener to Caller: CONCLUSION (confirms connection established)
+   Rendezvous握手交换具有以下握手类型的顺序：
 
-   Rendezvous handshake exchange has the following order of Handshake Types:
+   1. 开始连接后：WAVEAHAND。
+   2. 收到对端的上述消息后：CONCLUSION。
+   3. 收到对端的上述消息后：AGREEMENT。
 
-   1.  After starting the connection: WAVEAHAND.
-   2.  After receiving the above message from the peer: CONCLUSION.
-   3.  After receiving the above message from the peer: AGREEMENT.
+   当连接过程在任何一方可以发送CONCLUSION握手之前失败时，握手类型字段将包含被拒绝连接的适当错误值。请参阅表 7 中的错误代码列表。
 
-   When a connection process has failed before either party can send the CONCLUSION handshake, the Handshake Type field will contain the appropriate error value for the rejected connection.  See the list of error codes in Table 7.
+| 代码 | 错误 | 说明 |
+|--------|----------------|-----------------------------|
+| 1000 | REJ_UNKNOWN | 不明原因 |
+| 1001 | REJ_SYSTEM | 系统功能错误 |
+| 1002 | REJ_PEER | 被同行拒绝 |
+| 1003 | REJ_RESOURCE | 资源分配问题 |
+| 1004 | REJ_ROGUE | 握手数据不正确|
+| 1005 | REJ_BACKLOG | 听众的积压超出|
+| 1006 | REJ_IPE | 内部程序错误 |
+| 1007 | REJ_CLOSE | 套接字正在关闭|
+| 1008 | REJ_VERSION | peer 比 agent 的 min 版本更旧 |
+| 1009 | REJ_RDVCOOKIE | 会合 cookie 碰撞 |
+| 1010 | REJ_BADSECRET | 密码错误 |
+| 1011 | REJ_UNSECURE | 需要或意外密码 |
+| 1012 | REJ_MESSAGEAPI | 流旗碰撞 |
+| 1013 | REJ_CONGESTION | 不兼容的拥塞控制器类型|
+| 1014 | REJ_FILTER | 不兼容的包过滤器|
+| 1015 | REJ_GROUP | 不相容组 |
 
-| Code | Error          | Description                             |
-|------|----------------|-----------------------------------------|
-| 1000 | REJ_UNKNOWN    | Unknown reason                          |
-| 1001 | REJ_SYSTEM     | System function error                   |
-| 1002 | REJ_PEER       | Rejected by peer                        |
-| 1003 | REJ_RESOURCE   | Resource allocation problem             |
-| 1004 | REJ_ROGUE      | incorrect data in handshake             |
-| 1005 | REJ_BACKLOG    | listener's backlog exceeded             |
-| 1006 | REJ_IPE        | internal program error                  |
-| 1007 | REJ_CLOSE      | socket is closing                       |
-| 1008 | REJ_VERSION    | peer is older version than agent's min  |
-| 1009 | REJ_RDVCOOKIE  | rendezvous cookie collision             |
-| 1010 | REJ_BADSECRET  | wrong password                          |
-| 1011 | REJ_UNSECURE   | password required or unexpected         |
-| 1012 | REJ_MESSAGEAPI | Stream flag collision                   |
-| 1013 | REJ_CONGESTION | incompatible congestion-controller type |
-| 1014 | REJ_FILTER     | incompatible packet filter              |
-| 1015 | REJ_GROUP      | incompatible group                      |
+            表 7：握手拒绝原因代码
 
-            Table 7: Handshake Rejection Reason Codes
-
-
-   The specification of the cipher family and block size is decided by the data Sender.  When the transmission is bidirectional, this value MUST be agreed upon at the outset because when both are set the Responder wins.  For Caller-Listener connections it is reasonable to set this value on the Listener only.  In the case of Rendezvous the only reasonable approach is to decide upon the correct value from the different sources and to set it on both parties (note that *AES-128* is the default).
+   密码族和块大小的规范由数据发送者决定。当传输是双向的时，这个值必须在一开始就达成一致，因为当两者都设置时，响应者获胜。对于 Caller-Listener 连接，仅在 Listener 上设置此值是合理的。在 Rendezvous 的情况下，唯一合理的方法是确定来自不同来源的正确值并将其设置在双方（注意 *AES-128* 是默认值）。
 
 ### 4.3.1.  Caller-Listener Handshake
 
-   This section describes the handshaking process where a Listener is waiting for an incoming Handshake request on a bound UDP port from a Caller.  The process has two phases: induction and conclusion.
+   本节描述了侦听器在绑定的 UDP 端口上等待来自呼叫者的传入握手请求的握手过程。这个过程有两个阶段：INDUCTION 和CONCLUSION。
 
 #### 4.3.1.1.  The Induction Phase
 
-   The INDUCTION phase serves only to set a cookie on the Listener so that it doesn't allocate resources, thus mitigating a potential DoS attack that might be perpetrated by flooding the Listener with handshake commands.
+   INDUCTION 阶段仅用于在侦听器上设置一个 cookie，以便它不分配资源，从而减轻潜在的 DoS 攻击，该攻击可能通过使用握手命令淹没侦听器而实施。
 
-   The Caller begins by sending the INDUCTION handshake, which contains the following (significant) fields:
+   调用者首先发送 INDUCTION 握手，其中包含以下（重要）字段：
 
-   *  Version: MUST always be 4
-   *  Encryption Field: 0
-   *  Extension Field: 2
-   *  Handshake Type: INDUCTION
-   *  SRT Socket ID: SRT Socket ID of the Caller
-   *  SYN Cookie: 0
+   * Version: MUST always be 4
+   * Encryption Field: 0
+   * Extension Field: 2
+   * Handshake Type: INDUCTION
+   * SRT Socket ID：调用者的SRT Socket ID
+   * SYN Cookie：0
 
-   The Destination Socket ID of the SRT packet header in this message is 0, which is interpreted as a connection request.
+   该消息中SRT包头的Destination Socket ID为0，解释为连接请求。
 
-   The handshake version number is set to 4 in this initial handshake. This is due to the initial design of SRT that was to be compliant with the UDT protocol ([GHG04b]) on which it is based.
+   在此初始握手中，握手版本号设置为 4。这是由于 SRT 的初始设计符合其所基于的 UDT 协议 ([GHG04b])。
 
-   The Listener responds with the following:
+   侦听器响应以下内容：
 
-   *  Version: 5
-   *  Encryption Field: Advertised cipher family and block size.
-   *  Extension Field: SRT magic code 0x4A17
-   *  Handshake Type: INDUCTION
-   *  SRT Socket ID: Socket ID of the Listener
-   *  SYN Cookie: a cookie that is crafted based on host, port and current time with 1 minute accuracy to avoid SYN flooding attack [RFC4987]
+   * Version: 5
+   * Encryption Field: Advertised cipher family and block size.
+   * Extension Field: SRT magic code 0x4A17
+   * Handshake Type: INDUCTION
+   * SRT Socket ID：监听器的Socket ID
+   * SYN Cookie：基于主机、端口和当前时间制作的 cookie，精度为 1 分钟，以避免 SYN 泛洪攻击 [RFC4987]
 
-   At this point the Listener still does not know if the Caller is SRT or UDT, and it responds with the same set of values regardless of whether the Caller is SRT or UDT.
+   此时，Listener 仍然不知道 Caller 是 SRT 还是 UDT，并且无论 Caller 是 SRT 还是 UDT，它都会以相同的一组值进行响应。
 
-   If the party is SRT, it does interpret the values in Version and Extension Field.  If it receives the value 5 in Version, it understands that it comes from an SRT party, so it knows that it should prepare the proper handshake messages phase.  It also checks the following:
+   如果参与方是 SRT，它会解释版本和扩展字段中的值。如果它在 Version 中接收到值 5，它就知道它来自 SRT 方，因此它知道它应该准备适当的握手消息阶段。它还检查以下内容：
 
-   *  whether the Extension Flags contains the magic value 0x4A17; otherwise the connection is rejected.  This is a contingency for the case where someone who, in an attempt to extend UDT independently, increases the Version value to 5 and tries to test it against SRT.
-   *  whether the Encryption Flags contain a non-zero value, which is interpreted as an advertised cipher family and block size.
+   * Extension Flags 是否包含魔法值 0x4A17；否则连接被拒绝。如果有人试图独立扩展 UDT，将 Version 值增加到 5 并尝试针对 SRT 进行测试，这是一种意外情况。
+   * 加密标志是否包含非零值，该值被解释为广告密码族和块大小。
 
-   A legacy UDT party completely ignores the values reported in Version and Handshake Type.  It is, however, interested in the SYN Cookie value, as this must be passed to the next phase.  It does interpret these fields, but only in the "conclusion" message.
+   旧的 UDT 方完全忽略版本和握手类型中报告的值。然而，它对 SYN Cookie 值感兴趣，因为它必须传递到下一阶段。它确实解释了这些字段，但仅在“CONCLUSION”消息中。
 
 #### 4.3.1.2.  The Conclusion Phase
 
-   Once the Caller gets the SYN cookie from the Listener, it sends the CONCLUSION handshake to the Listener.
+   一旦 Caller 从 Listener 获得 SYN cookie，它就会向 Listener 发送 CONCLUSION 握手。
 
-   The following values are set by the compliant caller:
+   以下值由兼容的调用者设置：
 
    *  Version: 5
    *  Handshake Type: CONCLUSION
    *  SRT Socket ID: Socket ID of the Caller
    *  SYN Cookie: the cookie previously received in the induction phase
 
-   The Destination Socket ID in this message is the socket ID that was previously received in the induction phase in the SRT Socket ID field of the handshake structure.
+   此消息中的目标套接字 ID 是之前在握手结构的 SRT 套接字 ID 字段中的感应阶段收到的套接字 ID。
 
-   *  Encryption Flags: advertised cipher family and block size.
+   * 加密Flags: 公布的密码系列和块大小。
+   * 扩展Flags: 定义握手中提供的扩展的一组标志。
 
-   *  Extension Flags: A set of flags that define the extensions provided in the handshake.
+   侦听器使用上面显示的相同值进行响应，但没有 cookie（此处不需要），以及 HS 版本 5 的扩展（可能完全相同）。
 
-   The Listener responds with the same values shown above, without the cookie (which is not needed here), as well as the extensions for HS Version 5 (which will probably be exactly the same).
+   这里没有任何"negotiation"。如果握手中传递的值以任何方式不被对方接受，则连接将被拒绝。监听器可以优先于调用者的唯一情况是握手的加密字段中公布的密码族和块大小（表 2）。
 
-   There is not any "negotiation" here.  If the values passed in the handshake are in any way not acceptable by the other side, the connection will be rejected.  The only case when the Listener can have precedence over the Caller is the advertised Cipher Family and Block Size (Table 2) in the Encryption Field of the Handshake.
-
-   The value for latency is always agreed to be the greater of those reported by each party.
+   延迟值总是被认为是各方报告的值中的较大者。
 
 ### 4.3.2.  Rendezvous Handshake
 
-   The Rendezvous process uses a state machine.  It is slightly different from UDT Rendezvous handshake [GHG04b], although it is still based on the same message request types.
+   Rendezvous 进程使用状态机。它与 UDT Rendezvous 握手 [GHG04b] 略有不同，尽管它仍然基于相同的消息请求类型。
 
-   Both parties start with WAVEAHAND and use the Version value of 5.
-   Legacy Version 4 clients do not look at the Version value, whereas Version 5 clients can detect version 5.  The parties only continue with the Version 5 Rendezvous process when Version is set to 5 for both.  Otherwise the process continues exclusively according to Version 4 rules [GHG04b].
+   双方都以 WAVEAHAND 开头，并使用版本值 5。
+   旧版本 4 客户端不查看版本值，而版本 5 客户端可以检测版本 5。当双方的版本设置为 5 时，各方仅继续执行版本 5 集合点流程。否则，该过程仅根据版本 4 规则 [GHG04b] 继续。
 
-   With Version 5 Rendezvous, both parties create a cookie for a process called the "cookie contest".  This is necessary for the assignment of Initiator and Responder roles.  Each party generates a cookie value (a 32-bit number) based on the host, port, and current time with 1 minute accuracy.  This value is scrambled using an MD5 sum calculation.  The cookie values are then compared with one another.
+   在第 5 版 Rendezvous 中，双方为称为“cookie contest”的流程创建一个 cookie。这对于分配发起者和响应者角色是必要的。每一方根据主机、端口和当前时间生成一个 cookie 值（一个 32 位数字），精度为 1 分钟。使用 MD5 和计算对该值进行加扰。然后将 cookie 值相互比较。
 
-   Since it is impossible to have two sockets on the same machine bound to the same NIC and port and operating independently, it is virtually impossible that the parties will generate identical cookies. However, this situation may occur if an application tries to "connect to itself" - that is, either connects to a local IP address, when the socket is bound to INADDR_ANY, or to the same IP address to which the socket was bound.  If the cookies are identical (for any reason), the connection will not be made until new, unique cookies are generated (after a delay of up to one minute).  In the case of an application "connecting to itself", the cookies will always be identical, and so the connection will never be established.
+   由于同一台机器上不可能有两个套接字绑定到同一个 NIC 和端口并独立运行，因此双方几乎不可能生成相同的 cookie。但是，如果应用程序尝试“连接到自身”，即连接到本地 IP 地址（当套接字绑定到 INADDR_ANY 时）或连接到套接字绑定到的同一 IP 地址，则可能会发生这种情况。如果 cookie 相同（出于任何原因），则在生成新的唯一 cookie（最多延迟一分钟后）之前，不会建立连接。在应用程序“连接到自身”的情况下，cookie 将始终相同，因此永远不会建立连接。
 
-   When one party's cookie value is greater than its peer's, it wins the cookie contest and becomes Initiator (the other party becomes the Responder).
+   当一方的 cookie 值大于其对等方的值时，它将赢得 cookie contest并成为发起者（另一方成为响应者）。
 
-   At this point there are two possible "handshake flows": serial and parallel.
+   此时有两种可能的“握手流程”：串行和并行。
 
-#### 4.3.2.1.  Serial Handshake Flow
+#### 4.3.2.1 串行握手流程
 
-   In the serial handshake flow, one party is always first, and the other follows.  That is, while both parties are repeatedly sending WAVEAHAND messages, at some point one party - let's say Alice - will find she has received a WAVEAHAND message before she can send her next one, so she sends a CONCLUSION message in response.  Meantime, Bob (Alice's peer) has missed Alice's WAVEAHAND messages, so that Alice's CONCLUSION is the first message Bob has received from her.
+   在串行握手流程中，一方始终是第一方，另一方紧随其后。也就是说，虽然双方都在重复发送 WAVEAHAND 消息，但在某个时候，一方（比如说 Alice）会发现她在发送下一条消息之前已经收到了一条 WAVEAHAND 消息，因此她发送了一条 CONCLUSION 消息作为响应。同时，Bob（Alice 的同伴）错过了 Alice 的 WAVEAHAND 消息，因此 Alice 的 CONCLUSION 是 Bob 从她那里收到的第一条消息。
 
-   This process can be described easily as a series of exchanges between the first and following parties (Alice and Bob, respectively):
+   这个过程可以很容易地描述为第一方和后续方（分别为 Alice 和 Bob）之间的一系列交换：
 
-   1.  Initially, both parties are in the waving state.  Alice sends a handshake message to Bob:
+   1. 最初，双方都处于挥手状态。Alice 向 Bob 发送握手消息：
 
-       *  Version: 5
-       *  Type: Extension field: 0, Encryption field: advertised "PBKEYLEN".
-       *  Handshake Type: WAVEAHAND
-       *  SRT Socket ID: Alice's socket ID
-       *  SYN Cookie: Created based on host/port and current time.
+       * Version: 5
+       * Type: Extension field: 0, Encryption field: advertised "PBKEYLEN".
+       * Handshake Type: WAVEAHAND
+       * SRT Socket ID：Alice 的套接字 ID
+       * SYN Cookie：根据主机/端口和当前时间创建。
 
-   While Alice does not yet know if she is sending this message to a Version 4 or Version 5 peer, the values from these fields would not be interpreted by the Version 4 peer when the Handshake Type is WAVEAHAND.
+   虽然 Alice 还不知道她是在向第 4 版还是第 5 版对等方发送此消息，但当握手类型为 WAVEAHAND 时，第 4 版对等方不会解释来自这些字段的值。
 
-   1.  Bob receives Alice's WAVEAHAND message, switches to the "attention" state.  Since Bob now knows Alice's cookie, he performs a "cookie contest" (compares both cookie values).  If Bob's cookie is greater than Alice's, he will become the Initiator.  Otherwise, he will become the Responder.
-   The resolution of the Handshake Role (Initiator or Responder) is essential for further processing.
+   1. Bob 收到 Alice 的 WAVEAHAND 消息，切换到"attention"状态。由于 Bob 现在知道 Alice 的 cookie，因此他进行了“cookie contest”（比较两个 cookie 值）。如果 Bob 的 cookie 大于 Alice 的，他将成为发起者。否则，他将成为响应者。
+   握手角色（发起者或响应者）的解析对于进一步处理至关重要。
 
-   Then Bob responds:
+   然后 Bob 回应:
    *  Version: 5
    *  Extension field: appropriate flags if Initiator, otherwise 0
    *  Encryption field: advertised PBKEYLEN
    *  Handshake Type: CONCLUSION
 
-   If Bob is the Initiator and encryption is on, he will use either his own cipher family and block size or the one received from Alice (if she has advertised those values).
+   如果 Bob 是发起者并且加密开启，他将使用他自己的密码族和块大小或从 Alice 那里收到的（如果她已经公布了这些值）。
 
-   1.  Alice receives Bob's CONCLUSION message.  While at this point she also performs the "cookie contest", the outcome will be the same.
-       She switches to the "fine" state, and sends:
+   1. Alice 收到 Bob 的 CONCLUSION 消息。虽然此时她也进行了"cookie contest"，但结果是一样的。
+       她切换到“fine”状态，并发送：
 
        *  Version: 5
        *  Appropriate extension flags and encryption flags
        *  Handshake Type: CONCLUSION
 
-   Both parties always send extension flags at this point, which will contain HSREQ if the message comes from an Initiator, or HSRSP if it comes from a Responder.  If the Initiator has received a previous message from the Responder containing an advertised cipher family and block size in the encryption flags field, it will be used as the key length for key generation sent next in the KMREQ extension.
+   此时双方总是发送扩展标志，如果消息来自 Initiator，则包含 HSREQ，如果来自 Responder，则包含 HSRSP。如果发起方从响应方收到先前的消息，在加密标志字段中包含通告的密码族和块大小，则它将用作在 KMREQ 扩展中下一次发送的密钥生成的密钥长度。
 
-   1.  Bob receives Alice's CONCLUSION message, and then does one of the following (depending on Bob's role):
-       *  If Bob is the Initiator (Alice's message contains HSRSP), he:
-          -  switches to the "connected" state
-          -  sends Alice a message with Handshake Type AGREEMENT, but containing no SRT extensions (Extension Flags field should be 0)
-       *  If Bob is the Responder (Alice's message contains HSREQ), he:
-          -  switches to "initiated" state
-          -  sends Alice a message with Handshake Type CONCLUSION that also contains extensions with HSRSP
-             o  awaits a confirmation from Alice that she is also connected (preferably by AGREEMENT message)
-   2.  Alice receives the above message, enters into the "connected" state, and then does one of the following (depending on Alice's role):
-       *  If Alice is the Initiator (received CONCLUSION with HSRSP), she sends Bob a message with Handshake Type = AGREEMENT.
-       *  If Alice is the Responder, the received message has Handshake Type AGREEMENT and in response she does nothing.
-   3.  At this point, if Bob was Initiator, he is connected already.  If he was a Responder, he should receive the above AGREEMENT message, after which he switches to the "connected" state.  In the case where the UDP packet with the agreement message gets lost, Bob will still enter the "connected" state once he receives anything else from Alice.  If Bob is going to send, however, he has to continue sending the same CONCLUSION until he gets the confirmation from Alice.
+   1. Bob 收到 Alice 的 CONCLUSION 消息，然后执行以下操作之一（取决于 Bob 的角色）：
+       * 如果 Bob 是发起者（Alice 的消息包含 HSRSP），他：
+          - 切换到“连接”状态
+          - 向 Alice 发送握手类型 AGREEMENT 的消息，但不包含 SRT 扩展（扩展标志字段应为 0）
+       * 如果 Bob 是响应者（Alice 的消息包含 HSREQ），他：
+          - 切换到"initiated"状态
+          - 向 Alice 发送一条带有握手类型CONCLUSION的消息，该消息还包含带有 HSRSP 的扩展
+             o 等待 Alice 确认她也已连接（最好通过 AGREEMENT 消息）
+   2. Alice 收到上述消息，进入“connected”状态，然后执行以下操作之一（取决于 Alice 的角色）：
+       * 如果 Alice 是发起者（收到 HSRSP 的 CONCLUSION），她会向 Bob 发送 Handshake Type = AGREEMENT 的消息。
+       * 如果 Alice 是响应者，则接收到的消息具有握手类型 AGREEMENT，作为响应，她什么也不做。
+   3. 此时，如果 Bob 是 Initiator，则他已经连接。如果他是 Responder，他应该收到上面的 AGREEMENT 消息，然后切换到“connected”状态。在带有协议消息的 UDP 数据包丢失的情况下，一旦 Bob 从 Alice 那里收到任何其他信息，他仍然会进入“连接”状态。然而，如果 Bob 要发送，他必须继续发送相同的 CONCLUSION，直到他得到 Alice 的确认。
 
-#### 4.3.2.2.  Parallel Handshake Flow
+#### 4.3.2.2 并行握手流程
 
-   The chances of the parallel handshake flow are very low, but still it may occur if the handshake messages with WAVEAHAND are sent and received by both peers at precisely the same time.
+   并行握手流的机会非常低，但是如果两个对等点同时发送和接收带有 WAVEAHAND 的握手消息，它仍然可能发生。
 
-   The resulting flow is very much like Bob's behaviour in the serial handshake flow, but for both parties.  Alice and Bob will go through the same state transitions:
+   生成的流程非常类似于 Bob 在串行握手流程中的行为，但对双方来说都是如此。Alice 和 Bob 将经历相同的状态转换：
 
+   挥手->注意->发起->连接
    Waving -> Attention -> Initiated -> Connected
 
-   In the Attention state they know each other's cookies, so they can assign roles.  In contrast to serial flows, which are mostly based on request-response cycles, here everything happens completely
+   在注意状态下，他们知道彼此的 cookie，因此他们可以分配角色。与主要基于请求-响应周期的串行流相比，这里一切都发生了
 
-   asynchronously: the state switches upon reception of a particular handshake message with appropriate contents (the Initiator MUST attach the HSREQ extension, and Responder MUST attach the "HSRSP" extension).
+   异步：在接收到具有适当内容的特定握手消息时状态切换（发起者必须附加 HSREQ 扩展，响应者必须附加“HSRSP”扩展）。
 
-   Here's how the parallel handshake flow works, based on roles:
+   以下是基于角色的并行握手流程的工作方式：
 
-   Initiator:
+   发起人：
 
    1.  Waving
        *  Receives WAVEAHAND message
@@ -1041,9 +972,9 @@ Table 5: Handshake Extension Type values
              o  switches to Connected, sends AGREEMENT
 
    4.  Connected
-       *  May receive CONCLUSION and respond with AGREEMENT, but normally by now it should already have received payload packets.
+       * 可能会收到 CONCLUSION 并以 AGREEMENT 响应，但通常到现在它应该已经收到了有效负载数据包。
 
-   Responder:
+   响应者：
 
    1.  Waving
        *  Receives WAVEAHAND message
@@ -1051,8 +982,8 @@ Table 5: Handshake Extension Type values
        *  Sends CONCLUSION message (with no extensions)
 
    2.  Attention
-       *  Receives CONCLUSION message with HSREQ.  This message might contain no extensions, in which case the party shall simply send the empty CONCLUSION message, as before, and remain in this state.
-       *  Switches to Initiated and sends CONCLUSION message with HSRSP
+       * 接收带有 HSREQ 的 CONCLUSION 消息。此消息可能不包含扩展，在这种情况下，该方应像以前一样简单地发送空的 CONCLUSION 消息，并保持在此状态。
+       * 切换到 Initiated 并使用 HSRSP 发送 CONCLUSION 消息
 
    3.  Initiated
        *  Receives:
@@ -1064,39 +995,38 @@ Table 5: Handshake Extension Type values
              o  responds with AGREEMENT and switches to Connected
 
    4.  Connected
-       *  Is not expecting to receive any handshake messages anymore. The AGREEMENT message is always sent only once or per every final CONCLUSION message.
+       * 不再期望收到任何握手消息。AGREEMENT 消息总是只发送一次或每个最终的 CONCLUSION 消息。
 
-   Note that any of these packets may be missing, and the sending party will never become aware.  The missing packet problem is resolved this way:
+   请注意，这些数据包中的任何一个都可能丢失，并且发送方永远不会意识到这一点。丢失数据包问题是这样解决的：
 
-   1.  If the Responder misses the CONCLUSION + HSREQ message, it simply continues sending empty CONCLUSION messages.  Only upon reception of CONCLUSION + HSREQ does it respond with CONCLUSION + HSRSP.
-   2.  If the Initiator misses the CONCLUSION + HSRSP response from the Responder, it continues sending CONCLUSION + HSREQ.  The Responder MUST always respond with CONCLUSION + HSRSP when the Initiator sends CONCLUSION + HSREQ, even if it has already received and interpreted it.
-   3.  When the Initiator switches to the Connected state it responds with a AGREEMENT message, which may be missed by the Responder.
-       Nonetheless, the Initiator may start sending data packets because it considers itself connected - it does not know that the Responder has not yet switched to the Connected state.  Therefore it is exceptionally allowed that when the Responder is in the Initiated state and receives a data packet (or any control packet that is normally sent only between connected parties) over this connection, it may switch to the Connected state just as if it had received a AGREEMENT message.
-   4.  If the the Initiator has already switched to the Connected state it will not bother the Responder with any more handshake messages.  But the Responder may be completely unaware of that (having missed the AGREEMENT message from the Initiator).       Therefore it does not exit the connecting state, which means that it continues sending CONCLUSION + HSRSP messages until it receives any packet that will make it switch to the Connectedstate (normally AGREEMENT).  Only then does it exit the connecting state and the application can start transmission.
+   1. 如果 Responder 错过了 CONCLUSION + HSREQ 消息，它只是继续发送空的 CONCLUSION 消息。只有在收到 CONCLUSION + HSREQ 时，它才会以 CONCLUSION + HSRSP 响应。
+   2. 如果 Initiator 错过了 Responder 的 CONCLUSION + HSRSP 响应，它会继续发送 CONCLUSION + HSREQ。当发起方发送 CONCLUSION + HSREQ 时，响应方必须始终以 CONCLUSION + HSRSP 进行响应，即使它已经收到并解释了它。
+   3. 当 Initiator 切换到 Connected 状态时，它会以 AGREEMENT 消息进行响应，Responder 可能会错过该消息。
+       尽管如此，Initiator 可能会开始发送数据包，因为它认为自己已连接 - 它不知道 Responder 尚未切换到 Connected 状态。因此，例外情况是，当 Responder 处于 Initiated 状态并通过该连接接收到数据包（或任何通常仅在连接方之间发送的控制包）时，它可以切换到 Connected 状态，就像它收到了一样协议消息。
+   4. 如果 Initiator 已经切换到 Connected 状态，它不会再用任何握手消息打扰 Responder。但是响应者可能完全没有意识到这一点（错过了来自发起者的 AGREEMENT 消息）。因此它不会退出连接状态，这意味着它会继续发送 CONCLUSION + HSRSP 消息，直到它接收到任何使其切换到连接状态（通常为 AGREEMENT）的数据包。只有这样它才会退出连接状态，应用程序才能开始传输。
 
-## 4.4.  SRT Buffer Latency
+## 4.4 SRT 缓冲区延迟
 
-   The SRT sender and receiver have buffers to store packets.
+   SRT 发送方和接收方设有缓冲区来存储数据包。
 
-   On the sender, latency is the time that SRT holds a packet to give it a chance to be delivered successfully while maintaining the rate of the sender at the receiver.  If an acknowledgment (ACK) is missing or late for more than the configured latency, the packet is dropped from the sender buffer.  A packet can be retransmitted as long as it remains in the buffer for the duration of the latency window.  On the receiver, packets are delivered to an application from a buffer after the latency interval has passed.  This helps to recover from potential packet losses.  See Section 4.5, Section 4.6 for details.
+   在发送方，延迟是 SRT 持有数据包以使其有机会成功传送的时间，同时保持发送方在接收方的速率。如果确认 (ACK) 丢失或延迟超过配置的延迟，则从发送缓冲区丢弃数据包。只要数据包在延迟窗口期间，都保留在缓冲区中，就可重传数据包。在接收器上，经过延迟间隔后，数据包从缓冲区传送到应用程序。这有助于从潜在的数据包丢失中恢复。有关详细信息，请参阅第 4.5 节、第 4.6 节。
 
-   Latency is a value, in milliseconds, that can cover the time to transmit hundreds or even thousands of packets at high bitrate.
-   Latency can be thought of as a window that slides over time, during which a number of activities take place, such as the reporting of acknowledged packets (ACKs) (Section 4.8.1) and unacknowledged packets (NAKs)(Section 4.8.2).
+   延迟是一个以毫秒为单位的值，它可以涵盖以高比特率传输数百甚至数千个数据包的时间。
+   延迟可以被认为是一个随时间滑动的窗口，在此期间会发生许多活动，例如报告已确认数据包（ACK）（第 4.8.1 节）和未确认数据包（NAK）（第 4.8.2 节） .
 
-   Latency is configured through the exchange of capabilities during the extended handshake process between initiator and responder.  The Handshake Extension Message (Section 3.2.1.1) has TSBPD delay information, in milliseconds, from the SRT receiver and sender.  The latency for a connection will be established as the maximum value of latencies proposed by the initiator and responder.
+   延迟是通过在发起者和响应者之间的扩展握手过程中交换能力来配置的。握手扩展消息（第 3.2.1.1 节）具有来自 SRT 接收器和发送器的 TSBPD 延迟信息，以毫秒为单位。连接的延迟将被设成发起者和响应者提出的延迟的最大值。
 
-## 4.5.  Timestamp-Based Packet Delivery
+## 4.5 基于时间戳的数据包传递
 
-   The goal of the SRT Timestamp-Based Packet Delivery (TSBPD) mechanism is to reproduce the output of the sending application (e.g., encoder) at the input of the receiving application (e.g., decoder) in live data transmission mode (see Section 4.2).  It attempts to reproduce the timing of packets committed by the sending application to the SRT sender.  This allows packets to be scheduled for delivery by the SRT receiver, making them ready to be read by the receiving application (see Figure 17).
+   SRT 基于时间戳的数据包传递 (TSBPD) 机制的目标是在实时数据传输模式下，在接收应用程序（例如解码器）的输入端再现发送应用程序（例如编码器）的输出（参见第 4.2 节）. 它试图重现发送应用程序向 SRT 发送者提交数据包的时间。这允许 SRT 接收器安排数据包的传送，使它们准备好被接收应用程序读取（参见图 17）。
 
-   The SRT receiver, using the timestamp of the SRT data packet header, delivers packets to a receiving application with a fixed minimum delay from the time the packet was scheduled for sending on the SRT sender side.  Basically, the sender timestamp in the received packet is adjusted to the receiver's local time (compensating for the time drift or different time zones) before releasing the packet to the application.  Packets can be withheld by the SRT receiver for a configured receiver delay.  A higher delay can accommodate a larger uniform packet drop rate, or a larger packet burst drop.  Packets received after their "play time" are dropped if the Too-Late Packet Drop feature is enabled (see Section 4.6).
+   SRT 接收器使用 SRT 数据包头的时间戳，将数据包传送到接收应用程序，从数据包在 SRT 发送方安排发送的时间起，具有固定的最小延迟。基本上，在将数据包释放给应用程序之前，将接收数据包中的发送者时间戳调整为接收者的本地时间（补偿时间漂移或不同时区）。SRT 接收器可以为配置的接收器延迟保留数据包。更高的延迟可以适应更大的统一数据包丢弃率，或更大的数据包突发丢弃。如果启用了Tool Late丢包功能（参见第 4.6 节），则在其“播放时间”之后收到的数据包将被丢弃。
 
-   The packet timestamp, in microseconds, is relative to the SRT connection creation time.  Packets are inserted based on the sequence number in the header field.  The origin time, in microseconds, of the packet is already sampled when a packet is first submitted by the application to the SRT sender unless explicitly provided.  The TSBPD feature uses this time to stamp the packet for first transmission and any subsequent retransmission.  This timestamp and the configured SRT latency (Section 4.4) control the recovery buffer size and the instant that packets are delivered at the destination (the aforementioned "play time" which is decided by adding the timestamp to the configured latency).
+   数据包时间戳（以微秒为单位）与 SRT 连接创建时间相关。数据包根据标头字段中的序列号插入。除非明确提供，否则当应用程序首次将数据包提交给 SRT 发送方时，数据包的原始时间（以微秒为单位）已被采样。TSBPD 功能使用此时间标记数据包以进行首次传输和任何后续重传。此时间戳和配置的 SRT 延迟（第 4.4 节）控制恢复缓冲区的大小和数据包在目的地传送的时刻（上述“播放时间”通过将时间戳添加到配置的延迟来决定）。
 
-   It is worth mentioning that the use of the packet sending time to stamp the packets is inappropriate for the TSBPD feature, since a new time (current sending time) is used for retransmitted packets, putting them out of order when inserted at their proper place in the stream.
+   值得一提的是，使用数据包发送时间来标记数据包对于 TSBPD 特性是不合适的，因为重新传输的数据包使用了一个新的时间（当前发送时间），当插入到它们的正确位置时它们会乱序。流。
 
-
-   Figure 17 illustrates the key latency points during the packet transmission with the TSBPD feature enabled.
+   图 17 显示了启用 TSBPD 功能的数据包传输过程中的关键延迟点。
 ```
                  |  Sending  |              |                   |
                  |   Delay   |    ~RTT/2    |    SRT Latency    |
@@ -1115,61 +1045,59 @@ Table 5: Handshake Extension Type values
 
         Figure 17: Key Latency Points during the Packet Transmission
 ```
-   The main packet states shown in Figure 17 are the following:
+   图 17 中显示的主要数据包状态如下：
 
-   *  "Scheduled for sending": the packet is committed by the sending application, stamped and ready to be sent;
-   *  "Sent": the packet is passed to the UDP socket and sent;
-   *  "Received": the packet is received and read from the UDP socket;
-   *  "Scheduled for delivery": the packet is scheduled for the delivery and ready to be read by the receiving application.
+   * “Scheduled for sending”：数据包由发送应用程序提交，标记并准备发送；
+   * “Sent”：数据包被传递到UDP套接字并发送；
+   * "Received"：从 UDP 套接字接收和读取数据包；
+   * “Scheduled for Delivery”：数据包已安排好交付并准备好被接收应用程序读取。
 
-   It is worth noting that the round-trip time (RTT) of an SRT link may vary in time.  However the actual end-to-end latency on the link becomes fixed and is approximately equal to (RTT_0/2 + SRT Latency) once the SRT handshake exchange happens, where RTT_0 is the actual value of the round-trip time during the SRT handshake exchange (the value of the round-trip time once the SRT connection has been established).
+   值得注意的是，SRT 链路的往返时间 (RTT) 可能会随时间变化。然而，一旦发生 SRT 握手交换，链路上的实际端到端延迟变得固定，大约等于 (RTT_0/2 + SRT 延迟)，其中 RTT_0 是 SRT 握手期间往返时间的实际值交换（SRT 连接建立后的往返时间值）。
 
-   The value of sending delay depends on the hardware performance. Usually it is relatively small (several microseconds) in contrast to RTT_0/2 and SRT latency which are measured in milliseconds.
+   发送延迟的值取决于硬件性能。与以毫秒为单位的 RTT_0/2 和 SRT 延迟相比，它通常相对较小（几微秒）。
 
 ### 4.5.1.  Packet Delivery Time
 
-   Packet delivery time is the moment, estimated by the receiver, when a packet should be delivered to the upstream application.  The calculation of packet delivery time (PktTsbpdTime) is performed upon receiving a data packet according to the following formula:
+   数据包传递时间是接收方估计的将数据包传递给上游应用程序的时刻。数据包发送时间（PktTsbpdTime）的计算是在接收到一个数据包时按如下公式计算：
 
-   PktTsbpdTime = TsbpdTimeBase + PKT_TIMESTAMP + TsbpdDelay + Drift
+   PktTsbpdTime = TsbpdTimeBase + PKT_TIMESTAMP + TsbpdDelay + 漂移
 
-   where
+   * TsbpdTimeBase 是反映接收方本地时钟与发送方使用的时钟之间的时间差的时基，用于对正在发送的数据包进行时间戳（参见第 4.5.1.1 节）；
+   * PKT_TIMESTAMP 为数据包时间戳，单位为微秒；
+   * TsbpdDelay 是接收器的缓冲延迟（或接收器的缓冲延迟，或 SRT 延迟）。这是 SRT 从收到数据包到应该将其交付给上游应用程序的时间（以毫秒为单位）；
+   * 漂移是用于调整发送方和接收方时钟之间波动的时间漂移​​，以微秒为单位。
 
-   *  TsbpdTimeBase is the time base that reflects the time difference between local clock of the receiver and the clock used by the sender to timestamp packets being sent (see Section 4.5.1.1);
-   *  PKT_TIMESTAMP is the data packet timestamp, in microseconds;
-   *  TsbpdDelay is the receiver's buffer delay (or receiver's buffer latency, or SRT Latency).  This is the time, in milliseconds, that SRT holds a packet from the moment it has been received till the time it should be delivered to the upstream application;
-   *  Drift is the time drift used to adjust the fluctuations between sender and receiver clock, in microseconds.
+   SRT 延迟 (TsbpdDelay) 应该是一个足够大的缓冲时间，以覆盖意外延长的 RTT 时间，以及重新传输丢失数据包所需的时间。最小 TsbpdDelay 的值在 SRT 握手交换期间协商，等于 120 毫秒。TsbpdDelay 的推荐值为 RTT 的 3-4 倍。
 
-   SRT Latency (TsbpdDelay) should be a buffer time large enough to cover the unexpectedly extended RTT time, and the time needed to retransmit the lost packet.  The value of minimum TsbpdDelay is negotiated during the SRT handshake exchange and is equal to 120 milliseconds.  The recommended value of TsbpdDelay is 3-4 times RTT.
-
-   It is worth noting that TsbpdDelay limits the number of packet retransmissions to a certain extent making impossible to retransmit packets endlessly.  This is important for live data transmission.
+   值得注意的是，TsbpdDelay 在一定程度上限制了数据包的重传次数，使得无法无休止地重传数据包。这对于实时数据传输很重要。
 
 4.5.1.1.  TSBPD Time Base Calculation
 
-   The initial value of TSBPD time base (TsbpdTimeBase) is calculated at the moment of the second handshake request is received as follows:
+   TSBPD 时基（TsbpdTimeBase）的初始值是在接收到第二次握手请求时计算的，如下所示：
 
    TsbpdTimeBase = T_NOW - HSREQ_TIMESTAMP
 
-   where T_NOW is the current time according to the receiver clock; HSREQ_TIMESTAMP is the handshake packet timestamp, in microseconds.
+   其中 T_NOW 是根据接收器时钟的当前时间；HSREQ_TIMESTAMP 是握手包时间戳，以微秒为单位。
 
-   The value of TsbpdTimeBase is approximately equal to the initial one-way delay of the link RTT_0/2, where RTT_0 is the actual value of the round-trip time during the SRT handshake exchange.
+   TsbpdTimeBase 的值大约等于链路 RTT_0/2 的初始单向延迟，其中 RTT_0 是 SRT 握手交换期间往返时间的实际值。
 
-   During the transmission process, the value of TSBPD time base may be adjusted in two cases:
+   在传输过程中，TSBPD时基的值可能会在两种情况下进行调整：
 
-   1.  During the TSBPD wrapping period.  The TSBPD wrapping period happens every 01:11:35 hours.  This time corresponds to the maximum timestamp value of a packet (MAX_TIMESTAMP). MAX_TIMESTAMP is equal to 0xFFFFFFFF, or the maximum value of 32-bit unsigned integer, in microseconds (Section 3).  The TSBPD wrapping period starts 30 seconds before reaching the maximum timestamp value of a packet and ends once the packet with timestamp within (30, 60) seconds interval is delivered (read from the buffer).  The updated value of TsbpdTimeBase will be recalculated as follows:
+   1. 在 TSBPD 打包期间。TSBPD 包装周期每 01:11:35 发生一次。该时间对应于数据包的最大时间戳值（MAX_TIMESTAMP）。MAX_TIMESTAMP 等于 0xFFFFFFFF，或 32 位无符号整数的最大值，以微秒为单位（第 3 节）。TSBPD 包装周期在达到数据包的最大时间戳值之前的 30 秒开始，并在时间戳在 (30, 60) 秒间隔内的数据包交付（从缓冲区读取）后结束。TsbpdTimeBase 的更新值将重新计算如下：
 
       TsbpdTimeBase = TsbpdTimeBase + MAX_TIMESTAMP + 1
 
-   2.  By drift tracer.  See Section 4.7 for details.
+   2. 通过漂移示踪剂。有关详细信息，请参阅第 4.7 节。
 
 ## 4.6.  Too-Late Packet Drop
 
-   The Too-Late Packet Drop (TLPKTDROP) mechanism allows the sender to drop packets that have no chance to be delivered in time, and allows the receiver to skip missing packets that have not been delivered in time.  The timeout of dropping a packet is based on the TSBPD mechanism (see Section 4.5).
+   延迟丢包 (TLPKTDROP) 机制允许发送方丢弃没有机会及时传递的数据包，并允许接收方跳过未及时传递的丢失数据包。丢弃数据包的超时基于 TSBPD 机制（参见第 4.5 节）。
 
-   In the SRT, when Too-Late Packet Drop is enabled, and a packet timestamp is older than 125% of the SRT latency, it is considered too late to be delivered and may be dropped by the sender.  However, the sender keeps packets for at least 1 second in case the SRT latency is not enough for a large RTT (that is, if 125% of the SRT latency is less than 1 second).
+   在 SRT 中，如果启用了 Too-Late Packet Drop，并且数据包时间戳早于 SRT 延迟的 125%，则认为它发送得太晚，可能会被发送方丢弃。但是，发送方将数据包保留至少 1 秒，以防 SRT 延迟不足以用于大型 RTT（即，如果 125% 的 SRT 延迟小于 1 秒）。
 
-   When enabled on the receiver, the receiver drops packets that have not been delivered or retransmitted in time, and delivers the subsequent packets to the application when it is their time to play.
+   在接收器上启用后，接收器会丢弃未及时传递或重新传输的数据包，并在其播放时间时将后续数据包传递给应用程序。
 
-   In pseudo-code, the algorithm of reading from the receiver buffer is the following:
+   在伪代码中，从接收缓冲区读取的算法如下：
 ```
    <CODE BEGINS>
    pos = 0;  /* Current receiver buffer position */
@@ -1195,380 +1123,370 @@ Table 5: Handshake Extension Type values
    }
    <CODE ENDS>
 ```
-   where T_NOW is the current time according to the receiver clock.
+   其中 T_NOW 是根据接收器时钟的当前时间。
 
-   The TLPKTDROP mechanism can be turned off to always ensure a clean delivery.  However, a lost packet can simply pause a delivery for some longer, potentially undefined time, and cause even worse tearing for the player.  Setting higher SRT latency will help much more in the case when TLPKTDROP causes packet drops too often.
+   可以关闭 TLPKTDROP 机制以始终确保干净的交付。但是，丢失的数据包可能会简单地暂停交付更长时间，可能未定义的时间，并导致玩家更严重的撕裂。在 TLPKTDROP 导致丢包太频繁的情况下，设置更高的 SRT 延迟会更有帮助。
 
-## 4.7.  Drift Management
+## 4.7 漂移管理
 
-   When the sender enters "connected" status it tells the application there is a socket interface that is transmitter-ready.  At this point the application can start sending data packets.  It adds packets to the SRT sender's buffer at a certain input rate, from which they are transmitted to the receiver at scheduled times.
+   当发送方进入“Connected”状态时，它会告诉应用程序有一个已准备好发送器的套接字接口。此时应用程序可以开始发送数据包。它以一定的输入速率将数据包添加到 SRT 发送方的缓冲区，然后在预定的时间从那里将它们传输到接收方。
 
-   A synchronized time is required to keep proper sender/receiver buffer levels, taking into account the time zone and round-trip time (up to 2 seconds for satellite links).  Considering addition/subtraction round-off, and possibly unsynchronized system times, an agreed-upon time base drifts by a few microseconds every minute.  The drift may accumulate over many days to a point where the sender or receiver buffers will overflow or deplete, seriously affecting the quality of the video.  SRT has a time management mechanism to compensate for this drift.
+   考虑到时区和往返时间（卫星链路最长为 2 秒），需要同步时间来保持适当的发送方/接收方缓冲水平。考虑到加法/减法四舍五入以及可能不同步的系统时间，商定的时基每分钟漂移几微秒。漂移可能会在几天内累积到发送方或接收方缓冲区溢出或耗尽的程度，从而严重影响视频质量。SRT 有一个时间管理机制来补偿这种漂移。
 
-   When a packet is received, SRT determines the difference between the time it was expected and its timestamp.  The timestamp is calculated on the receiver side.  The RTT tells the receiver how much time it was supposed to take.  SRT maintains a reference between the time at the leading edge of the send buffer's latency window and the corresponding time on the receiver (the present time).  This allows to convert packet timestamp to the local receiver time.  Based on this time, various events (packet delivery, etc.) can be scheduled.
+   当接收到一个数据包时，SRT 确定它的预期时间和它的时间戳之间的差异。时间戳是在接收方计算的。RTT 告诉接收器它应该花费多少时间。SRT 维护发送缓冲区延迟窗口前沿的时间和接收器上的相应时间（当前时间）之间的参考。这允许将数据包时间戳转换为本地接收器时间。基于这个时间，可以安排各种事件（数据包传递等）。
 
-   The receiver samples time drift data and periodically calculates a packet timestamp correction factor, which is applied to each data packet received by adjusting the inter-packet interval.  When a packet is received it is not given right away to the application.  As time advances, the receiver knows the expected time for any missing or dropped packet, and can use this information to fill any "holes" in the receive queue with another packet (see Section 4.5).
+   接收端对时间漂移数据进行采样，并周期性地计算出一个数据包时间戳校正因子，该校正因子通过调整包间间隔应用于接收到的每个数据包。当收到一个数据包时，它不会立即提供给应用程序。随着时间的推移，接收者知道任何丢失或丢弃的数据包的预期时间，并且可以使用此信息用另一个数据包填充接收队列中的任何“漏洞”（参见第 4.5 节）。
 
-   It is worth noting that the period of sampling time drift data is based on a number of packets rather than time duration to ensure enough samples, independently of the media stream packet rate.  The effect of network jitter on the estimated time drift is attenuated by using a large number of samples.  The actual time drift being very slow (affecting a stream only after many hours) does not require a fast reaction.
+   值得注意的是，采样时间漂移数据的周期是基于数据包的数量而不是持续时间，以确保足够的样本，与媒体流的数据包速率无关。通过使用大量样本，网络抖动对估计时间漂移的影响被减弱。实际时间漂移非常慢（仅在数小时后影响流）不需要快速反应。
 
-   The receiver uses local time to be able to schedule events -- to determine, for example, if it is time to deliver a certain packet right away.  The timestamps in the packets themselves are just references to the beginning of the session.  When a packet is received (with a timestamp from the sender), the receiver makes a reference to the beginning of the session to recalculate its timestamp.  The start time is derived from the local time at the moment that the session is connected.  A packet timestamp equals "now" minus "StartTime", where the latter is the point in time when the socket was created.
-
-
-## 4.8.  Acknowledgement and Lost Packet Handling
-
-   To enable the Automatic Repeat reQuest of data packet retransmissions, a sender stores all sent data packets in its buffer.
-
-   The SRT receiver periodically sends acknowledgments (ACKs) for the received data packets so that the SRT sender can remove the acknowledged packets from its buffer (Section 4.8.1).  Once the acknowledged packets are removed, their retransmission is no longer possible and presumably not needed.
-
-   Upon receiving the full acknowledgment (ACK) control packet, the SRT sender should acknowledge its reception to the receiver by sending an ACKACK control packet with the sequence number of the full ACK packet being acknowledged.
-
-   The SRT receiver also sends NAK control packets to notify the sender about the missing packets (Section 4.8.2).  The sending of a NAK packet can be triggered immediately after a gap in sequence numbers of data packets is detected.  In addition, a Periodic NAK report mechanism can be used to send NAK reports periodically.  The NAK packet in that case will list all the packets that the receiver considers being lost up to the moment the Periodic NAK report is sent.
-
-   Upon reception of the NAK packet, the SRT sender prioritizes retransmissions of lost packets over the regular data packets to be transmitted for the first time.
-
-   The retransmission of the missing packet is repeated until the receiver acknowledges its receipt, or if both peers agree to drop this packet (see Section 4.6).
-
-### 4.8.1.  Packet Acknowledgement (ACKs, ACKACKs)
-
-   At certain intervals (see below), the SRT receiver sends an acknowledgment (ACK) that causes the acknowledged packets to be removed from the SRT sender's buffer.
-
-   An ACK control packet contains the sequence number of the packet immediately following the latest in the list of received packets.
-   Where no packet loss has occurred up to the packet with sequence number n, an ACK would include the sequence number (n + 1).
-
-   An ACK (from a receiver) will trigger the transmission of an ACKACK (by the sender), with almost no delay.  The time it takes for an ACK to be sent and an ACKACK to be received is the RTT.  The ACKACK tells the receiver to stop sending the ACK position because the sender already knows it.  Otherwise, ACKs (with outdated information) would continue to be sent regularly.  Similarly, if the sender does not receive an ACK, it does not stop transmitting.
-
-   There are two conditions for sending an acknowledgment.  A full ACK is based on a timer of 10 milliseconds (the ACK period or synchronization time interval SYN).  For high bitrate transmissions, a "light ACK" can be sent, which is an ACK for a sequence of packets. In a 10 milliseconds interval, there are often so many packets being sent and received that the ACK position on the sender does not advance quickly enough.  To mitigate this, after 64 packets (even if the ACK period has not fully elapsed) the receiver sends a light ACK. A light ACK is a shorter ACK (SRT header and one 32-bit field).  It does not trigger an ACKACK.
-
-   When a receiver encounters the situation where the next packet to be played was not successfully received from the sender, it will "skip" this packet (see Section 4.6) and send a fake ACK.  To the sender, this fake ACK is a real ACK, and so it just behaves as if the packet had been received.  This facilitates the synchronization between SRT sender and receiver.  The fact that a packet was skipped remains unknown by the sender.  Skipped packets are recorded in the statistics on the SRT receiver.
-
-### 4.8.2.  Packet Retransmission (NAKs)
-
-   The SRT receiver sends NAK control packets to notify the sender about the missing packets.  The NAK packet sending can be triggered immediately after a gap in sequence numbers of data packets is detected.
-
-   Upon reception of the NAK packet, the SRT sender prioritizes retransmissions of lost packets over the regular data packets to be transmitted for the first time.
-
-   The SRT sender maintains a list of lost packets (loss list) that is built from NAK reports.  When scheduling packet transmission, it looks to see if a packet in the loss list has priority and sends it if so.  Otherwise, it sends the next packet scheduled for the first transmission list.  Note that when a packet is transmitted, it stays in the buffer in case it is not received by the SRT receiver.
-
-   NAK packets are processed to fill in the loss list.  As the latency window advances and packets are dropped from the sending queue, a check is performed to see if any of the dropped or resent packets are in the loss list, to determine if they can be removed from there as well so that they are not retransmitted unnecessarily.
+   接收器使用本地时间来安排事件——例如，确定是否该立即传送某个数据包。数据包本身中的时间戳只是对会话开始的引用。当接收到一个数据包（带有来自发送者的时间戳）时，接收者参考会话的开始以重新计算其时间戳。开始时间源自会话连接时的本地时间。数据包时间戳等于“now”减去“StartTime”，后者是创建套接字的时间点。
 
 
-   There is a counter for the packets that are resent.  If there is no ACK for a packet, it will stay in the loss list and can be resent more than once.  Packets in the loss list are prioritized.
+## 4.8 确认和丢包处理
 
-   If packets in the loss list continue to block the send queue, at some point this will cause the send queue to fill.  When the send queue is full, the sender will begin to drop packets without even sending them the first time.  An encoder (or other application) may continue to provide packets, but there's no place for them, so they will end up being thrown away.
+   为了启用数据包重传的自动重复请求，发送方将所有发送的数据包存储在其缓冲区中。
 
-   This condition where packets are unsent does not happen often.  There is a maximum number of packets held in the send buffer based on the configured latency.  Older packets that have no chance to be retransmitted and played in time are dropped, making room for newer real-time packets produced by the sending application.  See Section 4.5, Section 4.6 for details.
+   SRT 接收器定期发送接收到的数据包的确认（ACK），以便 SRT 发送器可以从其缓冲区中删除已确认的数据包（第 4.8.1 节）。一旦确认的数据包被删除，它们就不再可能并且可能不需要重新传输。
 
-   In addition to the regular NAKs, the Periodic NAK report mechanism can be used to send NAK reports periodically.  The NAK packet in that case will have all the packets that the receiver considers being lost at the time of sending the Periodic NAK report.
+   在接收到完整确认 (ACK) 控制包后，SRT 发送方应通过发送带有已确认Full ACK 数据包序列号的 ACKACK 控制包来向接收方确认其接收。
 
-   SRT Periodic NAK reports are sent with a period of (RTT + 4 * RTTVar) / 2 (so called NAKInterval), with a 20 milliseconds floor, where RTT and RTTVar are defined in section Section 4.10.  A NAK control packet contains a compressed list of the lost packets.  Therefore, only lost packets are retransmitted.  By using NAKInterval for the NAK reports period, it may happen that lost packets are retransmitted more than once, but it helps maintain low latency in the case where NAK packets are lost.
+   SRT 接收器还发送 NAK 控制包以通知发送器丢失的数据包（第 4.8.2 节）。在检测到数据包的序号有间隙后，可以立即触发NAK包的发送。此外，可以使用 Periodic NAK 报告机制来定期发送 NAK 报告。在这种情况下，NAK 数据包将列出在发送定期 NAK 报告之前，接收方认为丢失的所有数据包。
 
-   An ACKACK tells the receiver to stop sending the ACK position because the sender already knows it.  Otherwise, ACKs (with outdated information) would continue to be sent regularly.
+   在接收到 NAK 数据包后，SRT 发送器将丢失数据包的重传优先于第一次传输的常规数据包。
 
-   An ACK serves as a ping, with a corresponding ACKACK pong, to measure RTT.  The time it takes for an ACK to be sent and an ACKACK to be received is the RTT.  Each ACK has a number.  A corresponding ACKACK has that same number.  The receiver keeps a list of all ACKs in a queue to match them.  Unlike a full ACK, which contains the current RTT and several other values in the Control Information Field (CIF) (Section 3.2.4), a light ACK just contains the sequence number.  All control messages are sent directly and processed upon reception, but ACKACK processing time is negligible (the time this takes is included in the round-trip time).
+   丢失数据包的重传会重复，直到接收方确认收到，或者如果双方同意丢弃这个数据包（见第 4.6 节）。
+
+### 4.8.1 数据包确认（ACKs、ACKACKs）
+
+   在特定的时间间隔（见下文），SRT 接收器发送一个确认（ACK），导致确认的数据包从 SRT 发送器的缓冲区中删除。
+
+   一个 ACK​​ 控制包包含紧跟接收数据包列表中最新的数据包的序列号。
+   在序列号为 n 的数据包之前没有发生数据包丢失的情况下，ACK 将包括序列号 (n + 1)。
+
+   ACK（来自接收方）将触发 ACKACK（由发送方）的传输，几乎没有延迟。发送 ACK 和接收 ACKACK 所花费的时间是 RTT。ACKACK 告诉接收方停止发送 ACK 位置，因为发送方已经知道它。否则，ACK（带有过时信息）将继续定期发送。同样，如果发送方没有收到 ACK，它也不会停止发送。
+
+   发送确认有两个条件。Full ACK 基于 10 毫秒的计时器（ACK 周期或同步时间间隔 SYN）。对于高比特率传输，可以发送“Light ACK”，它是对数据包序列的 ACK。在 10 毫秒的时间间隔内，发送和接收的数据包通常非常多，以至于发送方的 ACK 位置前进得不够快。为了缓解这种情况，在 64 个数据包之后（即使 ACK 周期还没有完全过去），接收器发送一个Light ACK。Light ACK 是较短的 ACK（SRT 头和一个 32 位字段），它不会触发 ACKACK。
+
+   当接收方遇到下一个要播放的数据包没有从发送方成功接收到的情况时，它会“跳过”这个数据包（参见第 4.6 节）并发送一个假的 ACK。对于发送者来说，这个假的 ACK 是一个真正的 ACK，所以它的行为就像数据包已经被接收一样。这有助于 SRT 发送方和接收方之间的同步。发送者仍然不知道数据包被跳过的事实。跳过的数据包记录在 SRT 接收器的统计信息中。
+
+### 4.8.2 数据包重传 (NAK)
+
+   SRT 接收器发送 NAK 控制包以通知发送器丢失的数据包。检测到数据包序号有间隙后，可以立即触发NAK包发送。
+
+   在接收到 NAK 数据包后，SRT 发送器将丢失数据包的重传优先于第一次传输的常规数据包。
+
+   SRT 发送方维护一个丢失数据包的列表（丢失列表），该列表是根据 NAK 报告构建的。在调度数据包传输时，它会查看丢失列表中的数据包是否具有优先级，如果有则发送。否则，它发送为第一个传输列表调度的下一个数据包。请注意，当数据包被发送时，它会留在缓冲区中，以防 SRT 接收器没有收到它。
+
+   处理 NAK 数据包以填充丢失列表。随着延迟窗口的推进和数据包从发送队列中被丢弃，将执行检查以查看是否有任何丢弃或重新发送的数据包在丢失列表中，以确定它们是否也可以从那里删除，以免它们不在丢失列表中。不必要地重传。
+
+   重新发送的数据包有一个计数器。如果一个数据包没有 ACK，它将留在丢失列表中，并且可以多次重发。丢失列表中的数据包优先。
+
+   如果丢失列表中的数据包继续阻塞发送队列，在某些时候这将导致发送队列被填满。当发送队列已满时，发送者将开始丢弃数据包，甚至没有第一次发送它们。编码器（或其他应用程序）可能会继续提供数据包，但它们没有位置，因此它们最终会被丢弃。
+
+   这种数据包未发送的情况并不经常发生。根据配置的延迟，发送缓冲区中保存的数据包数量有上限。没有机会重新传输和及时播放的旧数据包将被丢弃，从而为发送应用程序生成的新实时数据包腾出空间。有关详细信息，请参阅第 4.5 节、第 4.6 节。
+
+   除了常规的 NAK 之外，还可以使用 Periodic NAK 报告机制定期发送 NAK 报告。在这种情况下，NAK 数据包将包含接收方在发送定期 NAK 报告时认为丢失的所有数据包。
+
+   SRT 定期 NAK 报告的发送周期为 (RTT + 4 * RTTVar) / 2（所谓的 NAKInterval），下限为 20 毫秒，其中 RTT 和 RTTVar 在第 4.10 节中定义。NAK 控制包包含丢失数据包的压缩列表。因此，只重传丢失的数据包。通过将 NAKInterval 用于 NAK 报告周期，可能会发生多次重新传输丢失数据包的情况，但它有助于在 NAK 数据包丢失的情况下保持低延迟。
+
+   ACKACK 告诉接收方停止发送 ACK 位置，因为发送方已经知道它。否则，ACK（带有过时信息）将继续定期发送。
+
+   ACK 用作 ping，带有相应的 ACKACK pong，以测量 RTT。发送 ACK 和接收 ACKACK 所花费的时间是 RTT。每个 ACK​​ 都有一个编号。相应的 ACKACK 具有相同的编号。接收方在队列中保留所有 ACK 的列表以匹配它们。与包含当前 RTT 和控制信息字段 (CIF)（第 3.2.4 节）中的几个其他值的完整 ACK 不同，轻量级 ACK 仅包含序列号。所有控制消息都是直接发送并在接收时处理，但 ACKACK 处理时间可以忽略不计（此时间包含在往返时间中）。
 
 
-## 4.9.  Bidirectional Transmission Queues
+## 4.9 双向传输队列
 
-   Once an SRT connection is established, both peers can send data packets simultaneously.
+   一旦建立了 SRT 连接，双方就可以同时发送数据包。
 
 ## 4.10.  Round-Trip Time Estimation
 
-   Round-trip time (RTT) in SRT is estimated during the transmission of data packets based on a difference in time between an ACK packet is sent out and a corresponding ACKACK packet is received back by the SRT receiver.
+   SRT 中的往返时间 (RTT) 是在数据包传输期间根据发送 ACK 包与 SRT 接收器接收回相应 ACKACK 包之间的时间差来估计的。
 
-   An ACK sent by the receiver triggers an ACKACK from the sender with minimal processing delay.  The ACKACK response is expected to arrive at the receiver roughly one RTT after the corresponding ACK was sent.
+   接收方发送的 ACK 会以最小的处理延迟触发来自发送方的 ACKACK。ACKACK 响应预计会在相应的 ACK 发送后大约一个 RTT 到达接收器。
 
-   The SRT receiver records the time when an ACK is sent out.  The ACK carries a unique sequence number (independent of the data packet sequence number).  The corresponding ACKACK also carries the same sequence number.  Upon receiving the ACKACK, SRT calculates the RTT by comparing the difference between the ACKACK arrival time and the ACK departure time.  In the following formula, RTT is the current value that the receiver maintains and rtt is the recent value that was just calculated from an ACK/ACKACK pair:
+   SRT 接收器记录发送 ACK 的时间。ACK 携带唯一的序号（与数据包序号无关）。对应的ACKACK也携带相同的序列号。在收到 ACKACK 后，SRT 通过比较 ACKACK 到达时间和 ACK 离开时间之间的差异来计算 RTT。在以下公式中，RTT 是接收器维护的当前值，而 rtt 是刚刚从 ACK/ACKACK 对计算的最近值：
 
    RTT = RTT * 0.875 + rtt * 0.125
 
-   RTT variance RTTVar is obtained as follows:
+   RTT方差RTTVar得到如下：
 
    RTTVar = RTTVar * 0.75 + abs(RTT - rtt) * 0.25
 
-   where abs() means an absolute value.
+   其中 abs() 表示绝对值。
 
-   Both RTT and RTTVar are measured in microseconds.  The initial value of RTT is 100 milliseconds, RTTVar is 50 milliseconds.
+   RTT 和 RTTVar 都以微秒为单位。RTT 的初始值为 100 毫秒，RTTVar 为 50 毫秒。
 
-   The smoothed RTT calculated by the receiver as well as the RTT variance RTTVar are sent with the next full acknowledgement packet (see Section 3.2.4).  Note that the first ACK in an SRT session might contain an initial RTT value of 100 milliseconds, because the early calculations may not be precise.
+   接收方计算的平滑 RTT 以及 RTT 方差 RTTVar 与下一个Full Ack包一起发送（参见第 3.2.4 节）。请注意，SRT 会话中的第一个 ACK​​ 可能包含 100 毫秒的初始 RTT 值，因为早期计算可能不精确。
 
-   The sender always gets the RTT from the receiver.  It does not have an analog to the ACK/ACKACK mechanism, i.e. it can not send a message that guarantees an immediate return without processing.  Upon an ACK reception, the SRT sender updates its own RTT and RTTVar values using the same formulas as above, in which case rtt is the most recent value it receives, i.e., carried by an incoming ACK.
+   发送者总是从接收者那里得到 RTT。它没有类似于 ACK/ACKACK 机制，即它不能发送保证立即返回而不进行处理的消息。在收到 ACK 后，SRT 发送方使用与上述相同的公式更新其自己的 RTT 和 RTTVar 值，在这种情况下，rtt 是它接收到的最新值，即由传入的 ACK 携带。
 
-   Note that an SRT socket can both send and receive data packets.  RTT and RTTVar are updated by the socket based on algorithms for the sender (using ACK packets) and for the receiver (using ACK-ACKACK pairs).  When an SRT socket receives data, it updates its local RTT and RTTVar, which can be used for its own sender as well.
+   请注意，SRT 套接字既可以发送也可以接收数据包。RTT 和 RTTVar 由套接字根据发送方（使用 ACK 数据包）和接收方（使用 ACK-ACKACK 对）的算法进行更新。当一个 SRT 套接字接收到数据时，它会更新它的本地 RTT 和 RTTVar，它们也可以用于它自己的发送方。
 
-## 4.11.  Congestion Control
+## 4.11 拥塞控制
 
-   SRT provides certain mechanisms for the sender to get some feedback from the receiving side through the ACK packets (Section 3.2.4).
-   Every 10 ms the sender receives the latest values of RTT and RTT variance, Available Buffer Size, Packets Receiving Rate and Estimated Link Capacity.  Upon reception of the NAK packet (Section 3.2.5) the sender can detect packet losses during the transmission.  These mechanisms provide a solid background for various congestion control algorithms.
+   SRT 为发送方提供了一定的机制，可以通过 ACK 数据包从接收方获得一些反馈（第 3.2.4 节）。
+   每 10 毫秒，发送方会收到 RTT 和 RTT 方差、可用缓冲区大小、数据包接收率和估计链路容量的最新值。在接收到 NAK 数据包（第 3.2.5 节）后，发送方可以检测到传输过程中的数据包丢失。这些机制为各种拥塞控制算法提供了坚实的背景。
 
-   Given that SRT can operate in live and file transfer modes, there are two groups of congestion control algorithms possible.
+   鉴于 SRT 可以在实时和文件传输模式下运行，因此有两组可能的拥塞控制算法。
 
-   For live transmission mode (Section 4.2.2) the congestion control algorithm does not need to control the sending pace of the data packets, as the sending timing is provided by the live input. Although certain limitations on the minimal inter-sending time of consecutive packets can be applied in order to avoid congestion during fluctuations of the source bitrate.  Also it is allowed to drop those packets that can not be delivered in time.
+   对于实时传输模式（第 4.2.2 节），拥塞控制算法不需要控制包的发送速度，因为发送时间由实时输入提供。尽管可以应用对连续数据包的最小互发时间的某些限制，以避免源比特率波动期间的拥塞。还允许丢弃那些不能及时传递的数据包。
 
-   For file transfer, any known File Congestion Control algorithms like CUBIC [RFC8312] and BBR [BBR] can apply, including the congestion control mechanism proposed in UDT [GHG04b], [GuAnAO].  The UDT congestion control relies on the available link capacity, packet loss reports (NAK) and packet acknowledgements (ACKs).  It then slows down the output of packets as needed by adjusting the packet sending pace. In periods of congestion, it can block the main stream and focus on the lost packets.
+   对于文件传输，任何已知的文件拥塞控制算法，如 CUBIC [RFC8312] 和 BBR [BBR] 都可以应用，包括 UDT [GHG04b]、[GuAnAO] 中提出的拥塞控制机制。UDT 拥塞控制依赖于可用的链路容量、数据包丢失报告 (NAK) 和数据包确认 (ACK)。然后，它通过调整数据包发送速度来根据需要减慢数据包的输出速度。在拥塞期间，它可以阻塞主流并专注于丢失的数据包。
 
-# 5.  Encryption
+# 5. 加密
 
-   This section describes the encryption mechanism that protects the payload of SRT streams.  Based on standard cryptographic algorithms, the mechanism allows an efficient stream cipher with a key establishment method.
+   本节介绍保护 SRT 流有效负载的加密机制。基于标准密码算法，该机制允许使用密钥建立方法进行有效的流密码。
 
-## 5.1.  Overview
+## 5.1 概述
 
-   SRT implements encryption using AES [AES] in counter mode (AES-CTR) [SP800-38A] with a short-lived key to encrypt and decrypt the media stream.  The AES-CTR cipher is suitable for continuous stream encryption that permits decryption from any point, without access to start of the stream (random access), and for the same reason tolerates packet loss.  It also offers strong confidentiality when the counter is managed properly.
+   SRT 在计数器模式 (AES-CTR) [SP800-38A] 中使用 AES [AES] 实施加密，并使用短期密钥来加密和解密媒体流。AES-CTR 密码适用于允许从任何点解密的连续流加密，无需访问流的开始（随机访问），并且出于同样的原因可以容忍数据包丢失。如果柜台管理得当，它还可以提供很强的保密性。
 
-### 5.1.1.  Encryption Scope
+### 5.1.1 加密范围
 
-   SRT encrypts only the payload of SRT data packets (Section 3.1), while the header is left unencrypted.  The unencrypted header contains the Packet Sequence Number field used to keep the synchronization of the cipher counter between the encrypting sender and the decrypting receiver.  No constraints apply to the payload of SRT data packets as no padding of the payload is required by counter mode ciphers.
+   SRT 仅加密 SRT 数据包的有效负载（第 3.1 节），而标头未加密。未加密的报头包含数据包序列号字段，用于保持加密发送方和解密接收方之间密码计数器的同步。对 SRT 数据包的有效载荷没有限制，因为计数器模式密码不需要填充有效载荷。
 
-### 5.1.2.  AES Counter
+### 5.1.2 AES 计数器
 
-   The counter for AES-CTR is the size of the cipher's block, i.e. 128 bits.  It is derived from a 128-bit sequence consisting of
+   AES-CTR 的计数器是密码块的大小，即 128 位。它来自一个 128 位的序列，包括
 
-   *  a block counter in the least significant 16 bits, which counts the blocks in a packet,
-   *  a packet index - based on the packet sequence number in the SRT header - in the next 32 bits,
-   *  eighty zeroed bits.
+   * 最低有效 16 位的块计数器，用于对数据包中的块进行计数，
+   * 数据包索引 - 基于 SRT 标头中的数据包序列号 - 在接下来的 32 位中，
+   * 八十个零位。
 
-   The upper 112 bits of this sequence are XORed with an Initialization Vector (IV) to produce a unique counter for each crypto block.  The IV is derived from the Salt provided in the Keying Material (Section 3.2.2):
+   该序列的高 112 位与初始化向量 (IV) 进行异或运算，以生成每个加密块的唯一计数器。IV 源自Key Material（第 3.2.2 节）中提供的Salt：
 
-   IV = MSB(112, Salt): Most significant 112 bits of the salt.
+   IV = MSB(112, Salt)：Salt的最高有效 112 位。
 
-### 5.1.3.  Stream Encrypting Key (SEK)
+### 5.1.3 流加密密钥 (SEK)
 
-   The key used for AES-CTR encryption is called the "Stream Encrypting Key" (SEK).  It is used for up to 2^25 packets with further rekeying. The short-lived SEK is generated by the sender using a pseudo-random number generator (PRNG), and transmitted within the stream, wrapped with another longer-term key, the Key Encrypting Key (KEK), using a known AES key wrap protocol.
+   用于 AES-CTR 加密的密钥称为“流加密密钥”（SEK）。它最多可用于 2^25 个数据包，并进行进一步的密钥更新。短期 SEK 由发送方使用伪随机数生成器 (PRNG) 生成，并在流中传输，并使用已知的 AES 密钥包装协议与另一个长期密钥 - 密钥加密密钥 (KEK) 一起包装.
 
-   For connection-oriented transport such as SRT, there is no need to periodically transmit the short-lived key since no additional party can join a stream in progress.  The keying material is transmitted within the connection handshake packets, and for a short period when rekeying occurs.
+   对于 SRT 等面向连接的传输，不需要定期传输短期密钥，因为没有其他方可以加入正在进行的流。Key Material在连接握手数据包中传输，并且在重新生成密钥时会在短时间内传输。
 
-### 5.1.4.  Key Encrypting Key (KEK)
+### 5.1.4 密钥加密密钥 (KEK)
 
-   The Key Encrypting Key (KEK) is derived from a secret (passphrase) shared between the sender and the receiver.  The KEK provides access to the Stream Encrypting Key, which in turn provides access to the protected payload of SRT data packets.  The KEK has to be at least as long as the SEK.
+   密钥加密密钥 (KEK) 源自发送者和接收者之间共享的秘密（密码）。KEK 提供对流加密密钥的访问，而流加密密钥又提供对受保护的 SRT 数据包有效负载的访问。KEK 必须至少与 SEK 一样长。
 
-   The KEK is generated by a password-based key generation function (PBKDF2) [RFC2898], using the passphrase, a number of iterations(2048), a keyed-hash (HMAC-SHA1) [RFC2104], and a key length value (KLen).  The PBKDF2 function hashes the passphrase to make a long string, by repetition or padding.  The number of iterations is based on how much time can be given to the process without it becoming disruptive.
+   KEK 由基于密码的密钥生成函数 (PBKDF2) [RFC2898] 生成，使用密码短语、多次迭代 (2048)、密钥哈希 (HMAC-SHA1) [RFC2104] 和密钥长度值 (克伦）。PBKDF2 函数通过重复或填充对密码短语进行哈希处理以形成一个长字符串。迭代次数取决于可以给流程多少时间而不会造成破坏。
 
 ### 5.1.5.  Key Material Exchange
 
-   The KEK is used to generate a wrap [RFC3394] that is put in a key material (KM) message by the initiator of a connection (i.e. caller in caller-listener handshake and initiator in the rendezvous handshake, see Section 4.3) to send to the responder (listener).  The KM message contains the key length, the salt (one of the arguments provided to the PBKDF2 function), the protocol being used (e.g.   AES-256) and the AES counter (which will eventually change, see Section 5.1.6).
+   KEK 用于生成一个包装 [RFC3394]，该包装由连接的发起者（即呼叫者-侦听器握手中的调用者和会合握手中的发起者，参见第 4.3 节）放入Key Material (KM) 消息中以发送到响应者（听众）。KM 消息包含密钥长度、salt（提供给 PBKDF2 函数的参数之一）、正在使用的协议（例如 AES-256）和 AES 计数器（最终会改变，参见第 5.1.6 节）。
 
-   On the other side, the responder attempts to decode the wrap to obtain the Stream Encrypting Key. In the protocol for the wrap there is a padding, which is a known template, so the responder knows from the KM that it has the right KEK to decode the SEK.  The SEK (generated and transmitted by the initiator) is random, and cannot be known in advance.  The KEK formula is calculated on both sides, with the difference that the responder gets the key length (KLen) from the initiator via the key material (KM).  It is the initiator who decides on the configured length.  The responder obtains it from the material sent by the initiator.
+   另一方面，响应者尝试解码包装以获得流加密密钥。在 wrap 的协议中有一个填充，它是一个已知的模板，所以响应者从 KM 知道它有正确的 KEK 来解码 SEK。SEK（由发起者生成和传输）是随机的，无法提前知道。KEK公式是两边计算的，区别在于响应者通过Key Material（KM）从发起者那里得到密钥长度（KLen）。决定配置长度的是发起者。响应者从发起者发送的材料中获取。
 
-   The responder returns the same KM message to show that it has the same information as the initiator, and that the encoded material will be decrypted.  If the responder does not return this status, this means that it does not have the SEK.  All incoming encrypted packets received by the responder will be lost (undecrypted).  Even if they are transmitted successfully, the receiver will be unable to decrypt them, and so packets will be dropped.  All data packets coming from responder will be unencrypted.
+   响应者返回相同的 KM 消息，表明它与发起者具有相同的信息，并且编码的材料将被解密。如果响应者没有返回这个状态，这意味着它没有 SEK。响应者收到的所有传入加密数据包都将丢失（未解密）。即使它们传输成功，接收者也无法解密它们，因此数据包将被丢弃。来自响应者的所有数据包都将不加密。
 
 ### 5.1.6.  KM Refresh
 
-   The short lived SEK is regenerated for cryptographic reasons when a pre-determined number of packets has been encrypted.  The KM refresh period is determined by the implementation.  The receiver knows which SEK (odd or even) was used to encrypt the packet by means of the KK field of the SRT Data Packet (Section 3.1).
+   当预定数量的数据包被加密时，由于加密原因，短期 SEK 会重新生成。KM 刷新周期由实现决定。接收方通过 SRT 数据包的 KK 字段（第 3.1 节）知道使用哪个 SEK（奇数或偶数）加密数据包。
 
-   There are two variables used to determine the KM Refresh timing:
+   有两个变量用于确定 KM 刷新时间：
+   * KM Refresh Period 指定在切换到新 SEK 之前要发送的数据包数，
+   * KM Pre-Announcement Period 指定在密钥切换之前在多个数据包中宣布新密钥的时间。相同的值是
+      用于确定切换后何时停用旧密钥。
 
-   *  KM Refresh Period specifies the number of packets to be sent before switching to the new SEK,
-   *  KM Pre-Announcement Period specifies when a new key is announced in a number of packets before key switchover.  The same value is
-      used to determine when to decommission the old key after switchover.
+   建议的 KM 刷新周期是在发送 2^25 个使用相同 SEK 加密的数据包之后。建议的 KM 预公告期为 4000 个数据包（即在 2^25 减去 4000 个数据包时生成、包装和发送新密钥；旧密钥在 2^25 加上 4000 个数据包时停用）。
 
-   The recommended KM Refresh Period is after 2^25 packets encrypted with the same SEK are sent.  The recommended KM Pre-Announcement Period is 4000 packets (i.e. a new key is generated, wrapped, and sent at 2^25 minus 4000 packets; the old key is decommissioned at 2^25 plus 4000 packets).
+   偶数和奇数密钥在传输过程中按以下方式交替。具有较早密钥#1（假设它是奇数密钥）的数据包将继续发送。接收方将收到新密钥#2（偶数），然后解密并解包。如果接收方能够理解，将回复发送方。一旦发送方使用奇数密钥（密钥#1）到达第 2^25 个数据包，它将开始使用偶数密钥（密钥#2）发送数据包，因为它知道接收方拥有解密它们所需的信息。这是透明地发生的，从一个数据包到下一个数据包。在 2^25 加上 4000 个数据包时，第一个密钥将自动停用。
 
-   Even and odd keys are alternated during transmission the following way.  The packets with the earlier key #1 (let it be the odd key) will continue to be sent.  The receiver will receive the new key #2 (even), then decrypt and unwrap it.  The receiver will reply to the sender if it is able to understand.  Once the sender gets to the 2^25th packet using the odd key (key #1), it will then start to send packets with the even key (key #2), knowing that the receiver has what it needs to decrypt them.  This happens transparently, from one packet to the next.  At 2^25 plus 4000 packets the first key will be decommissioned automatically.
-
-   Both keys live in parallel for two times the Pre-Announcement Period (e.g. 4000 packets before the key switch, and 4000 packets after). This is to allow for packet retransmission.  It is possible for packets with the older key to arrive at the receiver a bit late.
-   Each packet contains a description of which key it requires, so the receiver will still have the ability to decrypt it.
-
+   两个密钥在预先通知周期的两倍内并行存在（例如，密钥切换之前的 4000 个数据包，之后的 4000 个数据包）。这是为了允许数据包重传。具有较旧密钥的数据包可能会晚一点到达接收器。
+   每个数据包都包含它需要哪个密钥的描述，因此接收者仍然可以解密它。
 
 
-## 5.2.  Encryption Process
+## 5.2 加密过程
 
-### 5.2.1.  Generating the Stream Encrypting Key
+### 5.2.1 生成流加密密钥
 
-   On the sending side SEK, Salt and KEK are generated the following way:
-
+   在发送方 SEK、Salt 和 KEK 的生成方式如下：
+```
    SEK  = PRNG(KLen)
    Salt = PRNG(128)
    KEK = PBKDF2(passphrase, LSB(64,Salt), Iter, Klen)
-
+```
    where
 
-   *  PBKDF2 is the PKCS#5 Password Based Key Derivation Function [RFC2898],
-   *  passphrase is the pre-shared passphrase,
-   *  Salt is the field of the KM message,
-   *  LSB(n, v) is the function taking n least significant bits of v,
-   *  Iter=2048 defines the number of iterations for PBKDF2,
-   *  KLen is the field of the KM message.
-
+   * PBKDF2 是 PKCS#5 基于密码的密钥派生函数 [RFC2898]，
+   * 密码是预共享的密码，
+   * Salt 是 KM 消息的字段，
+   * LSB(n, v) 是取 v 的 n 个最低有效位的函数，
+   * Iter=2048 定义了 PBKDF2 的迭代次数，
+   * Klen 是 KM 消息的字段。
+```
    Wrap = AESkw(KEK, SEK)
+```
+   其中 AESkw(KEK, SEK) 是密钥包装函数 [RFC3394]。
 
-   where AESkw(KEK, SEK) is the key wrapping function [RFC3394].
+### 5.2.2 加密有效载荷
 
-### 5.2.2.  Encrypting the Payload
-
-   The encryption of the payload of the SRT DATA packet is done with AES-CTR
-
+   SRT DATA 数据包有效载荷的加密是使用 AES-CTR 完成的
+```
    EncryptedPayload = AES_CTR_Encrypt(SEK, IV, UnencryptedPayload)
-
-   where the Initialization Vector is derived as
-
+```
+   其中初始化向量派生为
+```
    IV = (MSB(112, Salt) << 2) XOR (PktSeqNo)
+```
+   * PktSeqNo 是 SRT 数据包的 Packet Sequence Number 字段的值。
 
-   *  PktSeqNo is the value of the Packet Sequence Number field of the SRT data packet.
+## 5.3 解密过程
 
-## 5.3.  Decryption Process
+### 5.3.1 恢复流加密密钥
 
-### 5.3.1.  Restoring the Stream Encrypting Key
+   为了使接收方能够解密传入的流，它必须知道发送方使用的流加密密钥 (SEK)。接收方必须知道发送方使用的密码。剩余信息可以从Key Material消息中提取。
 
-   For the receiver to be able to decrypt the incoming stream it has to know the stream encrypting key (SEK) used by the sender.  The receiver must know the passphrase used by the sender.  The remaining information can be extracted from the Keying Material message.
+   Key Material消息包含编码器使用的 AES 包装的 [RFC3394] SEK。解包 SEK 所需的密钥加密密钥 (KEK) 计算如下：
 
-   The Keying Material message contains the AES-wrapped [RFC3394] SEK used by the encoder.  The Key-Encryption Key (KEK) required to unwrap the SEK is calculated as:
+   KEK = PBKDF2（密码，LSB（64，Salt），Iter，KLen）
 
-   KEK = PBKDF2(passphrase, LSB(64,Salt), Iter, KLen)
+   在哪里
 
-   where
-
-   *  PBKDF2 is the PKCS#5 Password Based Key Derivation Function [RFC2898],
-   *  passphrase is the pre-shared passphrase,
-   *  Salt is the field of the KM message,
-   *  LSB(n, v) is the function taking n least significant bits of v,
-   *  Iter=2048 defines the number of iterations for PBKDF2,
-   *  KLen is the field of the KM message.
+   * PBKDF2 是 PKCS#5 基于密码的密钥派生函数 [RFC2898]，
+   * 密码是预共享的密码，
+   * Salt 是 KM 消息的字段，
+   * LSB(n, v) 是取 v 的 n 个最低有效位的函数，
+   * Iter=2048 定义了 PBKDF2 的迭代次数，
+   * Klen 是 KM 消息的字段。
 
    SEK = AESkuw(KEK, Wrap)
 
-   where AESkuw(KEK, Wrap) is the key unwrapping function.
+   其中 AESkuw(KEK, Wrap) 是密钥解包函数。
 
-### 5.3.2.  Decrypting the Payload
+### 5.3.2 解密有效载荷
 
-   The decryption of the payload of the SRT data packet is done with AES-CTR
-
+   SRT数据包的payload解密是用AES-CTR完成的
+```
    DecryptedPayload = AES_CTR_Encrypt(SEK, IV, EncryptedPayload)
-
-   where the Initialization Vector is derived as
-
+```
+   其中初始化向量派生为
+```
    IV = (MSB(112, Salt) << 2) XOR (PktSeqNo)
+```
+   * PktSeqNo 是 SRT 数据包的 Packet Sequence Number 字段的值。
 
-   *  PktSeqNo is the value of the Packet Sequence Number field of the SRT data packet.
 
 
+# 6. 安全注意事项
 
-# 6.  Security Considerations
+   SRT 使用基于 AES 的流加密支持用户数据的机密性。用于加密的会话密钥在握手期间通过控制包传递，并受到密钥加密密钥的保护，密钥加密密钥由发送者和接收者生成，具有预共享的秘密，例如密码。与 UDT 一样，谨慎使用 SYN Cookie 可能有助于阻止拒绝服务攻击。适当的安全策略，包括密钥大小、密钥刷新周期以及密码短语应由安全人员管理，这超出了本文档的范围。
 
-   SRT supports confidentiality of user data using stream ciphering based on AES.  Session keys for ciphering are delivered through control packets during handshake, with the protection by Key Encryption Key, which is generated by a sender and receiver with pre-shared secret such as passphrase.  As in UDT, careful uses of SYN Cookies may help to deter denial of service attacks.  Appropriate security policy including key size, key refresh period, as well as passphrase should be managed by security officers, which is out of scope of the present document.
 
-# 7.  IANA Considerations
+# 7. IANA 注意事项
 
-   This document makes no requests of the IANA.
+   本文档未向 IANA 提出任何要求。
 
-## Contributors
+# 贡献者
 
-   This specification is heavily based on the SRT Protocol Technical Overview [SRTTO] written by Jean Dube and Steve Matthews.
+   该规范很大程度上基于 Jean Dube 和 Steve Matthews 编写的 SRT 协议技术概述 [SRTTO]。
 
-   In alphabetical order, the contributors to the pre-IETF SRT project and specification at Haivision are: Marc Cymontkowski, Roman Diouskine, Jean Dube, Mikolaj Malecki, Steve Matthews, Maria Sharabayko, Maxim Sharabayko, Adam Yellen.
+   按照字母顺序，Haivision 的 pre-IETF SRT 项目和规范的贡献者是：Marc Cymontkowski、Roman Diouskine、Jean Dube、Mikolaj Malecki、Steve Matthews、Maria Sharabayko、Maxim Sharabayko、Adam Yellen。
 
-   The contributors to this specification at SK Telecom are Jeongseok Kim and Joonwoong Kim.
+   SK Telecom 的此规范的贡献者是 Jeongseok Kim 和 Joonwoong Kim。
 
-   We cannot list all the contributors to the open-sourced implementation of SRT on GitHub.  But we appreciate the help, contribution, integrations and feedback of the SRT and SRT Alliances community.
+   我们无法列出 GitHub 上 SRT 开源实现的所有贡献者。但我们感谢 SRT 和 SRT 联盟社区的帮助、贡献、整合和反馈。
 
-## Acknowledgments
+# 致谢
 
-   The basis of the SRT protocol and its implementation was the UDP-based Data Transfer Protocol [GHG04b].  The authors thank Yunhong Gu and Robert Grossman, the authors of the UDP-based Data Transfer Protocol [GHG04b].
+   SRT 协议及其实现的基础是基于 UDP 的数据传输协议 [GHG04b]。作者感谢基于 UDP 的数据传输协议 [GHG04b] 的作者 Yunhong Gu 和 Robert Grossman。
 
-   TODO acknowledge.
+   TODO 确认。
 
-# References
+# 参考
 
-## Normative References
+## 参考规范
 
-   [RFC0768]  Postel, J., "User Datagram Protocol", STD 6, RFC 768,
-              DOI 10.17487/RFC0768, August 1980,
-              <https://www.rfc-editor.org/info/rfc768>.
+   [RFC0768] Postel, J.，“用户数据报协议”，STD 6，RFC 768，
+              DOI 10.17487/RFC0768，1980 年 8 月，
+              <https://www.rfc-editor.org/info/rfc768>。
 
-   [RFC2119]  Bradner, S., "Key words for use in RFCs to Indicate
-              Requirement Levels", BCP 14, RFC 2119,
-              DOI 10.17487/RFC2119, March 1997,
-              <https://www.rfc-editor.org/info/rfc2119>.
+   [RFC2119] Bradner, S.，“在 RFC 中使用的关键字来指示要求级别”，BCP 14，RFC 2119，
+              DOI 10.17487/RFC2119，1997 年 3 月，
+              <https://www.rfc-editor.org/info/rfc2119>。
 
-## Informative References
+## 参考资料
 
-   [AES]      National Institute of Standards and Technology, "FIPS Pub
-              197: Advanced Encryption Standard (AES)", November 2001,
-              <http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf>.
+   [AES] 美国国家标准与技术研究院，“FIPS Pub 197：高级加密标准 (AES)”，2001 年 11 月，
+              <http://csrc.nist.gov/publications/fips/fips197/fips-197.pdf>。
 
-   [AV1]      Rivaz, P.d. and J. Haughton, "AV1 Bitstream & Decoding
-              Process Specification", September 2020,
-              <https://aomediacodec.github.io/av1-spec/av1-spec.pdf>.
+   [AV1] Rivaz、Pd 和 J. Haughton，“AV1 比特流和解码工艺规范”，2020 年 9 月，
+              <https://aomediacodec.github.io/av1-spec/av1-spec.pdf>。
 
-   [BBR]      Cardwell, N., Cheng, Y., Gunn, C.S., Yeganeh, S.H., and V.
-              Jacobson, "BBR: Congestion-Based Congestion Control",
-              October 2016.
+   [BBR] Cardwell, N., Cheng, Y., Gunn, CS, Yeganeh, SH 和 V.
+              Jacobson，“BBR：基于拥塞的拥塞控制”，
+              2016 年 10 月。
 
-   [GHG04b]   Gu, Y., Hong, X., and R.L. Grossman, "Experiences in
-              Design and Implementation of a High Performance Transport
-              Protocol", DOI 10.1109/SC.2004.24, December 2004,
-              <https://doi.org/10.1109/SC.2004.24>.
+   [GHG04b] Gu, Y.、Hong, X. 和 RL Grossman，“在高性能传输的设计与实现协议”，
+              DOI 10.1109/SC.2004.24，2004 年 12 月，
+              <https://doi.org/10.1109/SC.2004.24>。
 
-   [GuAnAO]   Gu, Y., Hong, X., and R.L. Grossman, "An Analysis of AIMD Algorithm with Decreasing Increases", October 2004.
+   [GuAnAO] Gu, Y., Hong, X., and RL Grossman，“An Analysis of AIMD Algorithm with Dereducing increase”，2004 年 10 月。
 
-   [H.265]    International Telecommunications Union, "H.265 : High efficiency video coding", ITU-T Recommendation H.265,
-              2019.
+   [H.265] 国际电信联盟，“H.265：高效视频编码”，ITU-T H.265 建议书，2019 年。
 
-   [I-D.ietf-quic-http]
-              Bishop, M., "Hypertext Transfer Protocol Version 3
-              (HTTP/3)", Work in Progress, Internet-Draft, draft-ietf-
-              quic-http-29, 9 June 2020, <http://www.ietf.org/internet-drafts/draft-ietf-quic-http-29.txt>.
+   [ID.ietf-quic-http]
+              Bishop, M.，“超文本传输​​协议第 3 版(HTTP/3)”，正在进行的工作，Internet-Draft，
+              draft-ietf-quic-http-29，2020 年 6 月 9 日，<http://www.ietf.org/internet-drafts/draft-ietf-quic-http-29.txt>。
 
-   [I-D.ietf-quic-transport]
-              Iyengar, J. and M. Thomson, "QUIC: A UDP-Based Multiplexed
-              and Secure Transport", Work in Progress, Internet-Draft,
-              draft-ietf-quic-transport-29, 9 June 2020,
-              <http://www.ietf.org/internet-drafts/draft-ietf-quic-transport-29.txt>.
+   [ID.ietf-quic-transport]
+              Iyengar, J. 和 M. Thomson，“QUIC：基于 UDP 的多路复用和安全传输”，正在进行的工作，互联网草案，
+              Draft-ietf-quic-transport-29，2020 年 6 月 9 日，
+              <http://www.ietf.org/internet-drafts/draft-ietf-quic-transport-29.txt>。
 
    [ISO13818-1]
-              ISO, "Information technology -- Generic coding of moving pictures and associated audio information: Systems", ISO/IEC 13818-1, September 2020.
+              ISO，“信息技术——运动图像和相关音频信息的通用编码：系统”，ISO/IEC 13818-1，2020 年 9 月。
 
-   [ISO23009] ISO, "Information technology -- Dynamic adaptive streaming over HTTP (DASH)", ISO/IEC 23009:2019, September 2020.
+   [ISO23009] ISO，“信息技术——HTTP 上的动态自适应流式传输 (DASH)”，ISO/IEC 23009:2019，2020 年 9 月。
 
-   [PNPID]    "PNP ID AND ACPI ID REGISTRY", September 2020,
-              <https://uefi.org/PNP_ACPI_Registry>.
+   [PNPID]“PNP ID 和 ACPI ID 注册表”，2020 年 9 月，
+              <https://uefi.org/PNP_ACPI_Registry>。
 
-   [RFC2104]  Krawczyk, H., Bellare, M., and R. Canetti, "HMAC: Keyed-
-              Hashing for Message Authentication", RFC 2104,
-              DOI 10.17487/RFC2104, February 1997,
-              <https://www.rfc-editor.org/info/rfc2104>.
+   [RFC2104] Krawczyk, H.、Bellare, M. 和 R. Canetti，“HMAC：Keyed-
+              用于消息身份验证的散列”，RFC 2104，
+              DOI 10.17487/RFC2104，1997 年 2 月，
+              <https://www.rfc-editor.org/info/rfc2104>。
 
-   [RFC2898]  Kaliski, B., "PKCS #5: Password-Based Cryptography
-              Specification Version 2.0", RFC 2898,
-              DOI 10.17487/RFC2898, September 2000,
-              <https://www.rfc-editor.org/info/rfc2898>.
+   [RFC2898] Kaliski, B.，“PKCS #5：基于密码的密码学
+              规范版本 2.0"，RFC 2898，
+              DOI 10.17487/RFC2898，2000 年 9 月，
+              <https://www.rfc-editor.org/info/rfc2898>。
 
-   [RFC3031]  Rosen, E., Viswanathan, A., and R. Callon, "Multiprotocol
-              Label Switching Architecture", RFC 3031,
-              DOI 10.17487/RFC3031, January 2001,
-              <https://www.rfc-editor.org/info/rfc3031>.
+   [RFC3031] Rosen, E.、Viswanathan, A. 和 R. Callon，“多协议
+              标签交换架构”，RFC 3031，
+              DOI 10.17487/RFC3031，2001 年 1 月，
+              <https://www.rfc-editor.org/info/rfc3031>。
 
-   [RFC3394]  Schaad, J. and R. Housley, "Advanced Encryption Standard
-              (AES) Key Wrap Algorithm", RFC 3394, DOI 10.17487/RFC3394,
-              September 2002, <https://www.rfc-editor.org/info/rfc3394>.
+   [RFC3394] Schaad, J. 和 R. Housley，“高级加密标准
+              (AES) 密钥包装算法”，RFC 3394，DOI 10.17487/RFC3394，
+              2002 年 9 月，<https://www.rfc-editor.org/info/rfc3394>。
 
-   [RFC4987]  Eddy, W., "TCP SYN Flooding Attacks and Common
-              Mitigations", RFC 4987, DOI 10.17487/RFC4987, August 2007,
-              <https://www.rfc-editor.org/info/rfc4987>.
+   [RFC4987] Eddy, W.，“TCP SYN 泛洪攻击和常见
+              缓解”，RFC 4987，DOI 10.17487/RFC4987，2007 年 8 月，
+              <https://www.rfc-editor.org/info/rfc4987>。
 
-   [RFC8174]  Leiba, B., "Ambiguity of Uppercase vs Lowercase in RFC 2119 Key Words", BCP 14, RFC 8174, DOI 10.17487/RFC8174,
-              May 2017, <https://www.rfc-editor.org/info/rfc8174>.
+   [RFC8174] Leiba, B.，“RFC 2119 关键字中大写与小写的歧义”，BCP 14，RFC 8174，DOI 10.17487/RFC8174，
+              2017 年 5 月，<https://www.rfc-editor.org/info/rfc8174>。
 
-   [RFC8216]  Pantos, R., Ed. and W. May, "HTTP Live Streaming",
-              RFC 8216, DOI 10.17487/RFC8216, August 2017,
-              <https://www.rfc-editor.org/info/rfc8216>.
+   [RFC8216] Pantos, R., Ed. 和 W. May，“HTTP Live Streaming”，
+              RFC 8216，DOI 10.17487/RFC8216，2017 年 8 月，
+              <https://www.rfc-editor.org/info/rfc8216>。
 
-   [RFC8312]  Rhee, I., Xu, L., Ha, S., Zimmermann, A., Eggert, L., and R. Scheffenegger, "CUBIC for Fast Long-Distance Networks",
-              RFC 8312, DOI 10.17487/RFC8312, February 2018,
-              <https://www.rfc-editor.org/info/rfc8312>.
+   [RFC8312] Rhee, I.、Xu, L.、Ha, S.、Zimmermann, A.、Eggert, L. 和 R. Scheffenegger，“用于快速长距离网络的 CUBIC”，
+              RFC 8312，DOI 10.17487/RFC8312，2018 年 2 月，
+              <https://www.rfc-editor.org/info/rfc8312>。
 
-   [RTMP]     "Real-Time Messaging Protocol", September 2020, <https://www.adobe.com/devnet/rtmp.html>.
+   [RTMP]“实时消息传递协议”，2020 年 9 月，<https://www.adobe.com/devnet/rtmp.html>。
 
-   [SP800-38A]
-              Dworkin, M., "Recommendation for Block Cipher Modes of Operation", December 2001.
+   [SP800-38A] Dworkin, M.，“分组密码操作模式建议”，2001 年 12 月。
 
-   [SRTSRC]   "SRT fully functional reference implementation", September 2020, <https://github.com/Haivision/srt>.
+   [SRTSRC]《SRT全功能参考实现》，2020年9月，<https://github.com/Haivision/srt>。
 
-   [SRTTO]    Dube, J. and S. Matthews, "SRT Protocol Technical Overview", December 2019.
+   [SRTTO] Dube, J. 和 S. Matthews，“SRT 协议技术概述”，2019 年 12 月。
 
-   [VP9]      WebM, "VP9 Video Codec", September 2020, <https://www.webmproject.org/vp9>.
+   [VP9] WebM，“VP9 视频编解码器”，2020 年 9 月，<https://www.webmproject.org/vp9>。
 
-# Appendix A.  Packet Sequence List Coding
+# 附录 A. 数据包序列表编码
 
-   For any single packet sequence number, it uses the original sequence number in the field.  The first bit MUST start with "0".
+   对于任何单个数据包序列号，它使用字段中的原始序列号。第一位必须以“0”开头。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -1578,7 +1496,7 @@ Table 5: Handshake Extension Type values
 
                  Figure 18: Single sequence numbers coding
 ```
-   For any consecutive packet sequence numbers that the difference between the last and first is more than 1, only record the first (a) and the the last (b) sequence numbers in the list field, and modify the the first bit of a to "1".
+   对于任意连续的包序号，最后一个和第一个之差大于1，只在list字段中记录第一个（a）和最后一个（b）序号，并将a的第一位修改为“ 1"。
 ```
     0                   1                   2                   3
     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -1592,119 +1510,113 @@ Table 5: Handshake Extension Type values
 ```
 
 
+# 附录 B. SRT 访问控制
+
+   在 SRT 中建立连接时可以交换的一种信息是流 ID，它可以用于调用者-侦听器连接布局。这是在调用方设置的最多 512 个字符的字符串。它可以在新接受的连接上的侦听器端检索。
+
+   当 HS CONCLUSION到达时，SRT 侦听器可以通知上游应用程序有关连接尝试，从而公开 Stream ID 扩展消息的内容。基于此信息，应用程序可以接受或拒绝连接，选择所需的数据流，或为连接设置适当的密码。
+
+   流 ID 值可用作自由格式，但有一个推荐的约定，以便所有 SRT 用户使用相同的语言。
+   公约的目的是：
+   * 促进自由格式名称之间的可读性和一致性，
+   * 以 key-value 风格解释一些典型的数据。
+
+## B.1 一般语法
+
+   此推荐语法以 POSIX 中称为可执行规范的字符开头：#!。
+
+   接下来的两个字符是：
+```
+   : - 这标志着 YAML 格式，目前唯一使用的内容格式，可以是：
+       : - 没有嵌套的逗号分隔键
+       { - 同上，但允许嵌套且必须以 } 结尾
+
+   （嵌套意味着您可以在内部拥有多个级别的大括号​​封闭部件。）
+```
+   键值对的形式为：
+
+   键1=值1，键2=值2...
 
 
-# Appendix B.  SRT Access Control
+## B.2 标准键
 
-   One type of information that can be interchanged when a connection is being established in SRT is the Stream ID, which can be used in a caller-listener connection layout.  This is a string of maximum 512 characters set on the caller side.  It can be retrieved at the listener side on the newly accepted connection.
+   除了一般语法之外，还有几个顶级键被视为标准键。所有单字母键定义，包括本节未列出的定义，均保留供将来使用。用户还可以使用带有 user_* 或 companyname_* 前缀的自定义键定义，其中 user 和 companyname 将替换为实际用户或公司名称。
 
-   SRT listener can notify an upstream application about the connection attempt when a HS conclusion arrives, exposing the contents of the Stream ID extension message.  Based on this information, the application can accept or reject the connection, select the desired data stream, or set an appropriate passphrase for the connection.
+   现有的键值不得扩展，并且不得与本节中描述的不同。
 
-   The Stream ID value can be used as free-form, but there is a recommended convention so that all SRT users speak the same language.
-   The intent of the convention is to:
-   *  promote readability and consistency among free-form names,
-   *  interpret some typical data in the key-value style.
+   以下键是标准的：
 
-## B.1.  General Syntax
+   * u：用户名或授权名，用于控制应使用哪个密码进行连接。应用程序应解释它以区分侦听方应使用哪个用户来设置密码。
+   * r：资源名称标识资源的名称，如果侦听方能够服务多个资源，则便于选择。
+   * h：主机名标识资源的主机名。例如，要使用 URI somehost.com/videos/queerry.php?vid=366 请求流，主机名字段应为 somehost.com，资源名称可以为 videos/query.php?vid=366 或简单的 366 . 请注意，这仍然是一个需要明确指定的键。应用简化和 URI 提取的支持工具预计仅在此处插入 URI 的主机部分。
+   * s：Session ID是与服务器协商的临时资源标识符，仅用于验证。这是一次性标识符，第一次使用后失效。预期用途是首先通过单独的连接协商资源和授权的详细信息，然后在此处单独使用会话 ID。
 
-   This recommended syntax starts with the characters known as an executable specification in POSIX: #!.
+   * t：类型指定连接的目的。定义了几种标准类型，但用户可以扩展使用：
+      - 流（默认，如果未指定）：用于为应用程序定义的目的交换用户指定的有效负载，
+      - 文件：用于传输文件，其中 r 是文件名，
+      - auth：用于交换敏感数据。r 值说明了它的用途。到目前为止，还没有已知的具体可能值（未来使用）。
 
-   The next two characters are:
+   * m：此连接的预期模式：
+      - request（默认）：调用者想要接收流，
+      - 发布：调用者想要发送流数据，
+      - 双向：需要双向数据交换。
 
-   : - this marks the YAML format, the only one currently used The content format, which is either:
-       : - the comma-separated keys with no nesting
-       { - like above, but nesting is allowed and must end with }
+   注意，如果Stream ID不用于区分授权或资源，则不需要“m”，并且希望调用者发送数据。这仅适用于侦听器可以处理连接的各种目的的情况，因此需要知道调用者正在尝试做什么。
 
-   (Nesting means that you can have multiple level brace-enclosed parts inside.)
+## B.3。例子
 
-   The form of the key-value pair is:
-
-   key1=value1,key2=value2...
-
-
-## B.2.  Standard Keys
-
-   Beside the general syntax, there are several top-level keys treated as standard keys.  All single letter key definitions, including those not listed in this section, are reserved for future use.  Users can additionally use custom key definitions with user_* or companyname_* prefixes, where user and companyname are to be replaced with an actual user or company name.
-
-   The existing key values MUST not be extended, and MUST not differ from those described in this section.
-
-   The following keys are standard:
-
-   *  u: User Name, or authorization name, that is expected to control which password should be used for the connection.  The application should interpret it to distinguish which user should be used by the listener party to set up the password.
-
-   *  r: Resource Name identifies the name of the resource and facilitates selection should the listener party be able to serve multiple resources.
-
-   *  h: Host Name identifies the hostname of the resource. For example, to request a stream with the URI somehost.com/videos/querry.php?vid=366 the hostname field should have somehost.com, and the resource name can have videos/querry.php?vid=366 or simply 366.  Note that this is still a key to be specified explicitly. Support tools that apply simplifications and URI extraction areexpected to insert only the host portion of the URI here.
-
-   *  s: Session ID is a temporary resource identifier negotiated with the server, used just for verification.  This is a one-shot identifier, invalidated after the first use.  The expected usage is when details for the resource and authorization are negotiated over a separate connection first, and then the session ID is used here alone.
-
-   *  t: Type specifies the purpose of the connection.  Several standard types are defined, but users may extend the use:
-      -  stream (default, if not specified): for exchanging the user-specified payload for an application-defined purpose,
-      -  file: for transmitting a file, where r is the filename,
-      -  auth: for exchanging sensible data.  The r value states its purpose.  No specific possible values for that are known so far (FUTURE USE).
-
-   *  m: Mode expected for this connection:
-      -  request (default): the caller wants to receive the stream,
-      -  publish: the caller wants to send the stream data,
-      -  bidirectional: bidirectional data exchange is expected.
-
-   Note that "m" is not required in the case where Stream ID is not used to distinguish authorization or resources, and the caller is expected to send the data.  This is only for cases where the listener can handle various purposes of the connection and is therefore required to know what the caller is attempting to do.
-
-## B.3.  Examples
-
-   The example content of the StreamID is:
-
+   StreamID 的示例内容为：
+```
    #!::u=admin,r=bluesbrothers1_hi
-
-   It specifies the username and the resource name of the stream to be served to the caller.
-
+```
+   它指定要提供给调用者的流的用户名和资源名称。
+```
    #!::u=johnny,t=file,m=publish,r=results.csv
+```
+   这指定该文件应从调用者传输到侦听器，其名称为 results.csv。
 
-   This specifies that the file is expected to be transmitted from the caller to the listener and its name is results.csv.
+# 附录 C. 变更日志
 
-# Appendix C.  Changelog
+## C.1。从版本 00
 
-## C.1.  Since Version 00
+   * 改进和扩展“加密”部分的描述，
+   * 改进和扩展“往返时间估计”部分的描述，
+   * 将“握手”部分的描述扩展为“流 ID 扩展消息”、“组成员扩展”小节，
+   * 扩展“握手消息”部分，详细说明握手过程，
+   * 改进“关键材料”部分描述，
+   * 更改了“数据包结构”部分的数据包结构格式，
+   * 对“确认和丢失数据包处理”部分进行了少量补充，
+   * 修复了断开的链接，
+   * 扩展了参考列表。
 
-   *  Improved and extended the description of "Encryption" section,
-   *  Improved and extended the description of "Round-Trip Time Estimation" section,
-   *  Extended the description of "Handshake" section with "Stream ID Extension Message", "Group Membership Extension" subsections,
-   *  Extended "Handshake Messages" section with the detailed description of handshake procedure,
-   *  Improved "Key Material" section description,
-   *  Changed packet structure formatting for "Packet Structure" section,
-   *  Did minor additions to the "Acknowledgement and Lost Packet Handling" section,
-   *  Fixed broken links,
-   *  Extended the list of references.
+# 作者地址
 
-# Authors' Addresses
+   马克西姆·沙拉贝科
+   Haivision 网络视频有限公司
 
-   Maxim Sharabayko
-   Haivision Network Video, GmbH
-
-   Email: maxsharabayko@haivision.com
-
-
-   Maria Sharabayko
-   Haivision Network Video, GmbH
-
-   Email: msharabayko@haivision.com
+   电子邮件：maxsharabayko@haivision.com
 
 
-   Jean Dube
-   Haivision
+   玛丽亚·沙拉贝科
+   Haivision 网络视频有限公司
 
-   Email: jdube@haivision.com
-
-
-   Jeongseok Kim
-   SK Telecom Co., Ltd.
-
-   Email: jeongseok.kim@sk.com
+   电子邮件：msharabayko@haivision.com
 
 
-   Joonwoong Kim
-   SK Telecom Co., Ltd.
+   让·杜贝
+   海威视
 
-   Email: joonwoong.kim@sk.com
+   邮箱：jdube@haivision.com
 
+
+   金正锡
+   SK电讯株式会社
+
+   邮箱：jeongseok.kim@sk.com
+
+
+   金俊雄
+   SK电讯株式会社
+
+   电子邮件：joonwoong.kim@sk.com
 
