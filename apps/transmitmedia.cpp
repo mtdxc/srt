@@ -68,12 +68,6 @@ public:
         size_t nread = ifile.gcount();
         if (nread < pkt.payload.size())
             pkt.payload.resize(nread);
-
-        if (pkt.payload.empty())
-        {
-            return 0;
-        }
-
         return (int) nread;
     }
 
@@ -94,7 +88,7 @@ public:
         return !(ofile.bad()) ? (int) size : 0;
     }
 
-    bool IsOpen() override { return !!ofile; }
+    bool IsOpen() override { return bool(ofile); }
     bool Broken() override { return !ofile.good(); }
     //~FileTarget() { ofile.close(); }
     void Close() override { ofile.close(); }
@@ -109,29 +103,24 @@ Iface* CreateFile(const string& name) { return new typename File<Iface>::type (n
 
 shared_ptr<SrtStatsWriter> transmit_stats_writer;
 
-void SrtCommon::InitParameters(string host, map<string,string> par)
+void SrtCommon::InitParameters(string host, MapStr par)
 {
     // Application-specific options: mode, blocking, timeout, adapter
     if (Verbose::on && !par.empty())
     {
         Verb() << "SRT parameters specified:\n";
-        for (map<string,string>::iterator i = par.begin(); i != par.end(); ++i)
-        {
-            cerr << "\t" << i->first << " = '" << i->second << "'\n";
-        }
+        for (auto it : par)
+            cerr << "\t" << it.first << " = '" << it.second << "'\n";
     }
 
     string adapter;
     if (par.count("adapter"))
-    {
         adapter = par.at("adapter");
-    }
 
     m_mode = "default";
     if (par.count("mode"))
-    {
         m_mode = par.at("mode");
-    }
+
     SocketOption::Mode mode = SrtInterpretMode(m_mode, host, adapter);
     if (mode == SocketOption::FAILURE)
     {
@@ -198,10 +187,8 @@ void SrtCommon::PrepareListener(string host, int port, int backlog)
         Error("ConfigurePre");
 
     sockaddr_any sa = CreateAddr(host, port);
-    sockaddr* psa = sa.get();
     Verb() << "Binding a server on " << host << ":" << port << " ...";
-
-    stat = srt_bind(m_bindsock, psa, sizeof sa);
+    stat = srt_bind(m_bindsock, sa.get(), sizeof sa);
     if ( stat == SRT_ERROR )
     {
         srt_close(m_bindsock);
@@ -209,7 +196,6 @@ void SrtCommon::PrepareListener(string host, int port, int backlog)
     }
 
     Verb() << " listen...";
-
     stat = srt_listen(m_bindsock, backlog);
     if ( stat == SRT_ERROR )
     {
@@ -234,9 +220,9 @@ void SrtCommon::StealFrom(SrtCommon& src)
 
 bool SrtCommon::AcceptNewClient()
 {
-    sockaddr_any scl;
     Verb() << " accept... ";
 
+    sockaddr_any scl;
     m_sock = srt_accept(m_bindsock, scl.get(), &scl.len);
     if ( m_sock == SRT_INVALID_SOCK )
     {
@@ -261,7 +247,7 @@ bool SrtCommon::AcceptNewClient()
     return true;
 }
 
-void SrtCommon::Init(string host, int port, map<string,string> par, bool dir_output)
+void SrtCommon::Init(string host, int port, MapStr par, bool dir_output)
 {
     m_output_direction = dir_output;
     InitParameters(host, par);
@@ -365,6 +351,17 @@ int SrtCommon::ConfigurePre(SRTSOCKET sock)
     return 0;
 }
 
+void SrtCommon::PrepareClient()
+{
+    m_sock = srt_create_socket();
+    if ( m_sock == SRT_ERROR )
+        Error("srt_create_socket");
+
+    int stat = ConfigurePre(m_sock);
+    if ( stat == SRT_ERROR )
+        Error("ConfigurePre");
+}
+
 void SrtCommon::SetupAdapter(const string& host, int port)
 {
     sockaddr_any localsa = CreateAddr(host, port);
@@ -385,18 +382,6 @@ void SrtCommon::OpenClient(string host, int port)
 
     ConnectClient(host, port);
 }
-
-void SrtCommon::PrepareClient()
-{
-    m_sock = srt_create_socket();
-    if ( m_sock == SRT_ERROR )
-        Error("srt_create_socket");
-
-    int stat = ConfigurePre(m_sock);
-    if ( stat == SRT_ERROR )
-        Error("ConfigurePre");
-}
-
 
 void SrtCommon::ConnectClient(string host, int port)
 {
@@ -448,11 +433,8 @@ void SrtCommon::OpenRendezvous(string adapter, string host, int port)
     }
 
     const int outport = m_outgoing_port ? m_outgoing_port : port;
-
     sockaddr_any localsa = CreateAddr(adapter, outport, sa.family());
-
     Verb() << "Binding a server on " << adapter << ":" << outport;
-
     stat = srt_bind(m_sock, localsa.get(), sizeof localsa);
     if ( stat == SRT_ERROR )
     {
@@ -461,7 +443,6 @@ void SrtCommon::OpenRendezvous(string adapter, string host, int port)
     }
 
     Verb() << "Connecting to " << host << ":" << port;
-
     stat = srt_connect(m_sock, sa.get(), sizeof sa);
     if ( stat == SRT_ERROR )
     {
@@ -498,19 +479,17 @@ SrtCommon::~SrtCommon()
     Close();
 }
 
-SrtSource::SrtSource(string host, int port, const map<string,string>& par)
+SrtSource::SrtSource(string host, int port, const MapStr& par)
 {
     Init(host, port, par, false);
 
-    ostringstream os;
+    std::ostringstream os;
     os << host << ":" << port;
     hostport_copy = os.str();
 }
 
 int SrtSource::Read(size_t chunk, MediaPacket& pkt, ostream &out_stats)
 {
-    static unsigned long counter = 1;
-
     if (pkt.payload.size() < chunk)
         pkt.payload.resize(chunk);
 
@@ -528,9 +507,10 @@ int SrtSource::Read(size_t chunk, MediaPacket& pkt, ostream &out_stats)
     if (chunk < pkt.payload.size())
         pkt.payload.resize(chunk);
 
-    const bool need_bw_report = transmit_bw_report && (counter % transmit_bw_report) == transmit_bw_report - 1;
-    const bool need_stats_report = transmit_stats_report && (counter % transmit_stats_report) == transmit_stats_report - 1;
-
+    static unsigned long counter = 0;
+    counter++;
+    const bool need_bw_report = transmit_bw_report && (counter % transmit_bw_report) == 0;
+    const bool need_stats_report = transmit_stats_report && (counter % transmit_stats_report) == 0;
     if (need_bw_report || need_stats_report)
     {
         CBytePerfMon perf;
@@ -543,7 +523,6 @@ int SrtSource::Read(size_t chunk, MediaPacket& pkt, ostream &out_stats)
                 out_stats << transmit_stats_writer->WriteStats(m_sock, perf) << std::flush;
         }
     }
-    ++counter;
     return stat;
 }
 
@@ -567,8 +546,6 @@ int SrtTarget::ConfigurePre(SRTSOCKET sock)
 
 int SrtTarget::Write(const char* data, size_t size, int64_t src_time, ostream &out_stats)
 {
-    static unsigned long counter = 1;
-
     SRT_MSGCTRL ctrl = srt_msgctrl_default;
     ctrl.srctime = src_time;
     int stat = srt_sendmsg2(m_sock, data, (int) size, &ctrl);
@@ -577,9 +554,10 @@ int SrtTarget::Write(const char* data, size_t size, int64_t src_time, ostream &o
         return stat;
     }
 
-    const bool need_bw_report = transmit_bw_report && (counter % transmit_bw_report) == transmit_bw_report - 1;
-    const bool need_stats_report = transmit_stats_report && (counter % transmit_stats_report) == transmit_stats_report - 1;
-
+    static unsigned long counter = 0;
+    counter++;
+    const bool need_bw_report = transmit_bw_report && (counter % transmit_bw_report) == 0;
+    const bool need_stats_report = transmit_stats_report && (counter % transmit_stats_report) == 0;
     if (need_bw_report || need_stats_report)
     {
         CBytePerfMon perf;
@@ -592,12 +570,11 @@ int SrtTarget::Write(const char* data, size_t size, int64_t src_time, ostream &o
                 out_stats << transmit_stats_writer->WriteStats(m_sock, perf) << std::flush;
         }
     }
-    ++counter;
     return stat;
 }
 
 
-SrtModel::SrtModel(string host, int port, map<string,string> par)
+SrtModel::SrtModel(string host, int port, MapStr par)
 {
     InitParameters(host, par);
     if (m_mode == "caller")
@@ -622,7 +599,6 @@ void SrtModel::Establish(std::string& w_name)
     if (is_caller)
     {
         // Establish a connection
-
         PrepareClient();
 
         if (w_name != "")
@@ -682,7 +658,7 @@ template <> struct Srt<Source> { typedef SrtSource type; };
 template <> struct Srt<Target> { typedef SrtTarget type; };
 
 template <class Iface>
-Iface* CreateSrt(const string& host, int port, const map<string,string>& par) { return new typename Srt<Iface>::type (host, port, par); }
+Iface* CreateSrt(const string& host, int port, const MapStr& par) { return new typename Srt<Iface>::type (host, port, par); }
 
 class ConsoleSource: public Source
 {
@@ -782,10 +758,10 @@ class UdpCommon
 protected:
     int m_sock = -1;
     sockaddr_any sadr;
-    string adapter;
-    map<string, string> m_options;
+    std::string adapter;
+    MapStr m_options;
 
-    void Setup(string host, int port, map<string,string> attr)
+    void Setup(std::string host, int port, MapStr attr)
     {
         m_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (m_sock == -1)
@@ -833,12 +809,14 @@ protected:
             ip_mreq_source mreq_ssm;
             ip_mreq mreq;
             sockaddr_any maddr (AF_INET);
+            // IP_ADD_SOURCE_MEMBERSHIP or IP_ADD_MEMBERSHIP
             int opt_name;
+            // pt to mreq_ssm or mreq
             void* mreq_arg_ptr;
             socklen_t mreq_arg_size;
 
             adapter = attr.count("adapter") ? attr.at("adapter") : string();
-            if ( adapter == "" )
+            if ( adapter.empty() )
             {
                 Verb() << "Multicast: home address: INADDR_ANY:" << port;
                 maddr.sin.sin_family = AF_INET;
@@ -887,19 +865,19 @@ protected:
             // is called with multicast address. Write the address
             // that designates the network device here.
             // Also, sets port sharing when working with multicast
-            sadr = maddr;
             int reuse = 1;
             int shareAddrRes = setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&reuse), sizeof(reuse));
             if (shareAddrRes == status_error)
             {
                 throw runtime_error("marking socket for shared use failed");
             }
+            sadr = maddr;
             Verb() << "Multicast(Windows): will bind to home address";
 #else
             Verb() << "Multicast(POSIX): will bind to IGMP address: " << host;
 #endif
-            int res = setsockopt(m_sock, IPPROTO_IP, opt_name, mreq_arg, mreq_arg_size);
 
+            int res = setsockopt(m_sock, IPPROTO_IP, opt_name, mreq_arg, mreq_arg_size);
             if ( res == status_error )
             {
                 Error(errno, "adding to multicast membership failed");
@@ -943,9 +921,7 @@ protected:
     {
         char buf[512];
         string message = SysStrError(err, buf, 512u);
-
         cerr << "\nERROR #" << err << ": " << message << endl;
-
         throw TransmissionError("error: " + src + ": " + message);
     }
 
@@ -970,7 +946,7 @@ class UdpSource: public Source, public UdpCommon
     bool eof = true;
 public:
 
-    UdpSource(string host, int port, const map<string,string>& attr)
+    UdpSource(string host, int port, const MapStr& attr)
     {
         Setup(host, port, attr);
         int stat = ::bind(m_sock, sadr.get(), sadr.size());
@@ -1014,13 +990,13 @@ public:
 class UdpTarget: public Target, public UdpCommon
 {
 public:
-    UdpTarget(string host, int port, const map<string,string>& attr )
+    UdpTarget(string host, int port, const MapStr& attr )
     {
         if (host.empty())
             cerr << "\nWARN Host for UDP target is not provided. Will send to localhost:" << port << ".\n";
 
         Setup(host, port, attr);
-        if (adapter != "")
+        if (!adapter.empty())
         {
             sockaddr_any maddr = CreateAddr(adapter, 0);
             if (maddr.family() != AF_INET)
@@ -1029,7 +1005,6 @@ public:
             }
 
             in_addr addr = maddr.sin.sin_addr;
-
             int res = setsockopt(m_sock, IPPROTO_IP, IP_MULTICAST_IF, reinterpret_cast<const char*>(&addr), sizeof(addr));
             if (res == -1)
             {
@@ -1062,7 +1037,7 @@ template <> struct Udp<Source> { typedef UdpSource type; };
 template <> struct Udp<Target> { typedef UdpTarget type; };
 
 template <class Iface>
-Iface* CreateUdp(const string& host, int port, const map<string,string>& par) { return new typename Udp<Iface>::type (host, port, par); }
+Iface* CreateUdp(const string& host, int port, const MapStr& par) { return new typename Udp<Iface>::type (host, port, par); }
 
 template<class Base>
 inline bool IsOutput() { return false; }
@@ -1085,9 +1060,8 @@ extern unique_ptr<Base> CreateMedium(const string& uri)
     case UriParser::FILE:
         if (u.host() == "con" || u.host() == "console")
         {
-            if (IsOutput<Base>() && (
-                (Verbose::on && Verbose::cverb == &cout)
-                || g_stats_are_printed_to_stdout))
+            if (IsOutput<Base>() && 
+               ((Verbose::on && Verbose::cverb == &cout) || g_stats_are_printed_to_stdout))
             {
                 cerr << "ERROR: file://con with -v or -r or -s would result in mixing the data and text info.\n";
                 cerr << "ERROR: HINT: you can stream through a FIFO (named pipe)\n";
@@ -1098,7 +1072,7 @@ extern unique_ptr<Base> CreateMedium(const string& uri)
 // Disable regular file support for the moment
 #if 0
         else
-            ptr.reset( CreateFile<Base>(u.path()));
+            ptr.reset(CreateFile<Base>(u.path()));
 #endif
         break;
 

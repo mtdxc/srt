@@ -308,8 +308,7 @@ bool DoUpload(UriParser& ut, string path, string filename,
             }
 
             int events = SRT_EPOLL_OUT | SRT_EPOLL_ERR;
-            if (srt_epoll_add_usock(pollid,
-                    tar->GetSRTSocket(), &events))
+            if (srt_epoll_add_usock(pollid, tar->GetSRTSocket(), &events))
             {
                 cerr << "Failed to add SRT destination to poll, "
                     << tar->GetSRTSocket() << endl;
@@ -334,7 +333,6 @@ bool DoUpload(UriParser& ut, string path, string filename,
         assert(efdlen == 1);
 
         SRT_SOCKSTATUS status = srt_getsockstate(s);
-
         switch (status)
         {
             case SRTS_LISTENING:
@@ -393,8 +391,7 @@ bool DoUpload(UriParser& ut, string path, string filename,
                     << (!shift ? string() : "+" + Sprint(shift));
                 if (st == SRT_ERROR)
                 {
-                    cerr << "Upload: SRT error: " << srt_getlasterror_str()
-                        << endl;
+                    cerr << "Upload: SRT error: " << srt_getlasterror_str() << endl;
                     goto exit;
                 }
 
@@ -431,8 +428,7 @@ bool DoUpload(UriParser& ut, string path, string filename,
             int st = srt_getsndbuffer(s, &blocks, &bytes);
             if (st == SRT_ERROR)
             {
-                cerr << "Error in srt_getsndbuffer: " << srt_getlasterror_str()
-                    << endl;
+                cerr << "Error in srt_getsndbuffer: " << srt_getlasterror_str() << endl;
                 goto exit;
             }
             if (bytes == 0)
@@ -441,8 +437,7 @@ bool DoUpload(UriParser& ut, string path, string filename,
                 result = true;
                 break;
             }
-            Verb() << "Sending buffer still: bytes=" << bytes << " blocks="
-                << blocks;
+            Verb() << "Sending buffer still: bytes=" << bytes << " blocks=" << blocks;
             srt::sync::this_thread::sleep_for(srt::sync::milliseconds_from(250));
         }
     }
@@ -489,8 +484,7 @@ bool DoDownload(UriParser& us, string directory, string filename,
             }
 
             int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
-            if (srt_epoll_add_usock(pollid,
-                    src->GetSRTSocket(), &events))
+            if (srt_epoll_add_usock(pollid, src->GetSRTSocket(), &events))
             {
                 cerr << "Failed to add SRT source to poll, "
                     << src->GetSRTSocket() << endl;
@@ -534,8 +528,7 @@ bool DoDownload(UriParser& us, string directory, string filename,
                     goto exit;
                 }
                 id = srt::getstreamid(s);
-                cerr << "Source connected (listener), id ["
-                    << id << "]" << endl;
+                cerr << "Source connected (listener), id [" << id << "]" << endl;
                 connected = true;
                 continue;
             }
@@ -545,8 +538,7 @@ bool DoDownload(UriParser& us, string directory, string filename,
                 if (!connected)
                 {
                     id = srt::getstreamid(s);
-                    cerr << "Source connected (caller), id ["
-                        << id << "]" << endl;
+                    cerr << "Source connected (caller), id [" << id << "]" << endl;
                     connected = true;
                 }
             }
@@ -556,8 +548,8 @@ bool DoDownload(UriParser& us, string directory, string filename,
             // The app will just try to read and in worst case it will
             // get an error.
             case SRTS_BROKEN:
-            cerr << "Connection closed, reading buffer remains\n";
-            break;
+                cerr << "Connection closed, reading buffer remains\n";
+                break;
 
             case SRTS_NONEXIST:
             case SRTS_CLOSED:

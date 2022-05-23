@@ -65,7 +65,7 @@
 #include <thread>
 #include <list>
 
-
+#include "onceToken.h"
 #include "apputil.hpp"  // CreateAddr
 #include "uriparser.hpp"  // UriParser
 #include "socketoptions.hpp"
@@ -81,7 +81,6 @@
 #include <logging.h>
 
 using namespace std;
-
 
 
 struct ForcedExit: public std::runtime_error
@@ -121,29 +120,73 @@ void OnAlarm_Interrupt(int)
     }
 }
 
-extern "C" void TestLogHandler(void* opaque, int level, const char* file, int line, const char* area, const char* message);
+void TestLogHandler(void* opaque, int level, const char* file, int line, const char* area, const char* message)
+{
+#if 0
+    char prefix[100] = "";
+    if ( opaque )
+        strncpy(prefix, (char*)opaque, 99);
+#endif        
+    time_t now;
+    time(&now);
+    char buf[1024];
+    struct tm local = SysLocalTime(now);
+    size_t pos = strftime(buf, 1024, "[%c ", &local);
+
+#ifdef _MSC_VER
+    // That's something weird that happens on Microsoft Visual Studio 2013
+    // Trying to keep portability, while every version of MSVS is a different plaform.
+    // On MSVS 2015 there's already a standard-compliant snprintf, whereas _snprintf
+    // is available on backward compatibility and it doesn't work exactly the same way.
+#define snprintf _snprintf
+#endif
+    snprintf(buf+pos, 1024-pos, "%s:%d(%s)]{%d} %s", file, line, area, level, message);
+
+    cerr << buf << endl;
+}
 
 
 
 struct LiveTransmitConfig
 {
+    // 退出超时
     int timeout = 0;
     int timeout_mode = 0;
+
+    // 读取块大小
     int chunk_size = -1;
-    bool quiet = false;
-    srt_logging::LogLevel::type loglevel = srt_logging::LogLevel::error;
-    set<srt_logging::LogFA> logfas;
-    bool log_internal;
-    string logfile;
-    int bw_report = 0;
+    // 传递原始时间戳
     bool srctime = false;
+    // 缓冲包数
     size_t buffering = 10;
-    int stats_report = 0;
-    string stats_out;
+
+    // quiet mode
+    bool quiet = false;
+    // log level {fatal,error,warn,note,info,debug}
+    srt_logging::LogLevel::type loglevel = srt_logging::LogLevel::error;
+    // enabled logtag name
+    set<srt_logging::LogFA> logfas;
+    string logfile;     ///< write logs to file
+    bool log_internal;
+
+    //stats config
+    int bw_report = 0;      ///< every_n_packets bandwidth report frequency
+    int stats_report = 0;   ///< every_n_packets status report frequency
+    string stats_out;       ///< output stats to file
+    // stats printing format {json, csv, default}
     SrtStatsPrintFormat stats_pf = SRTSTATS_PROFMAT_2COLS;
-    bool auto_reconnect = true;
+    // full counters in stats-report (prints total statistics)
     bool full_stats = false;
 
+    // 自动重连
+    bool auto_reconnect = true;
+    /*
+    SCHEME://HOST:PORT/PATH?PARAM1=VALUE&PARAM2=VALUE...
+    Supported schemes:
+        srt: use HOST, PORT, and PARAM for setting socket options
+        udp: use HOST, PORT and PARAM for some UDP specific settings
+        file: only as file://con for using stdin or stdout
+    */
     string source;
     string target;
 };
@@ -151,8 +194,8 @@ struct LiveTransmitConfig
 
 void PrintOptionHelp(const OptionName& opt_names, const string &value, const string &desc)
 {
-    cerr << "\t";
     int i = 0;
+    cerr << "\t";
     for (auto opt : opt_names.names)
     {
         if (i++) cerr << ", ";
@@ -360,23 +403,18 @@ int parse_args(LiveTransmitConfig &cfg, int argc, char** argv)
 
 int main(int argc, char** argv)
 {
-    srt_startup();
-    // This is mainly required on Windows to initialize the network system,
-    // for a case when the instance would use UDP. SRT does it on its own, independently.
-    if (!SysInitializeNetwork())
-        throw std::runtime_error("Can't initialize network!");
-
-    // Symmetrically, this does a cleanup; put into a local destructor to ensure that
-    // it's called regardless of how this function returns.
-    struct NetworkCleanup
-    {
-        ~NetworkCleanup()
-        {
-            srt_cleanup();
-            SysCleanupNetwork();
-        }
-    } cleanupobj;
-
+    onceToken netInit([](){
+        srt_startup();
+        // This is mainly required on Windows to initialize the network system,
+        // for a case when the instance would use UDP. SRT does it on its own, independently.
+        if (!SysInitializeNetwork())
+            throw std::runtime_error("Can't initialize network!");
+    }, [](){
+        // Symmetrically, this does a cleanup; put into a local destructor to ensure that
+        // it's called regardless of how this function returns.
+        srt_cleanup();
+        SysCleanupNetwork();
+    });
 
     LiveTransmitConfig cfg;
     const int parse_ret = parse_args(cfg, argc, argv);
@@ -389,6 +427,7 @@ int main(int argc, char** argv)
     if (cfg.chunk_size > 0)
         transmit_chunk_size = cfg.chunk_size;
     transmit_stats_writer = SrtStatsWriterFactory(cfg.stats_pf);
+    // bandwidth report frequency <every_n_packets=0>
     transmit_bw_report = cfg.bw_report;
     transmit_stats_report = cfg.stats_report;
     transmit_total_stats = cfg.full_stats;
@@ -400,8 +439,8 @@ int main(int argc, char** argv)
     if (!cfg.logfas.empty())
     {
         srt_resetlogfa(nullptr, 0);
-        for (set<srt_logging::LogFA>::iterator i = cfg.logfas.begin(); i != cfg.logfas.end(); ++i)
-            srt_addlogfa(*i);
+        for (auto it : cfg.logfas)
+            srt_addlogfa(it);
     }
 
     //
@@ -437,7 +476,7 @@ int main(int argc, char** argv)
     // SRT stats output
     //
     std::ofstream logfile_stats; // leave unused if not set
-    if (cfg.stats_out != "")
+    if (!cfg.stats_out.empty())
     {
         logfile_stats.open(cfg.stats_out.c_str());
         if (!logfile_stats)
@@ -476,11 +515,7 @@ int main(int argc, char** argv)
 
     if (!cfg.quiet)
     {
-        cerr << "Media path: '"
-            << cfg.source
-            << "' --> '"
-            << cfg.target
-            << "'\n";
+        cerr << "Media path: '" << cfg.source << "' --> '" << cfg.target << "'\n";
     }
 
     unique_ptr<Source> src;
@@ -517,8 +552,7 @@ int main(int argc, char** argv)
                 switch (src->uri.type())
                 {
                 case UriParser::SRT:
-                    if (srt_epoll_add_usock(pollid,
-                        src->GetSRTSocket(), &events))
+                    if (srt_epoll_add_usock(pollid, src->GetSRTSocket(), &events))
                     {
                         cerr << "Failed to add SRT source to poll, "
                             << src->GetSRTSocket() << endl;
@@ -526,8 +560,7 @@ int main(int argc, char** argv)
                     }
                     break;
                 case UriParser::UDP:
-                    if (srt_epoll_add_ssock(pollid,
-                        src->GetSysSocket(), &events))
+                    if (srt_epoll_add_ssock(pollid, src->GetSysSocket(), &events))
                     {
                         cerr << "Failed to add UDP source to poll, "
                             << src->GetSysSocket() << endl;
@@ -535,8 +568,7 @@ int main(int argc, char** argv)
                     }
                     break;
                 case UriParser::FILE:
-                    if (srt_epoll_add_ssock(pollid,
-                        src->GetSysSocket(), &events))
+                    if (srt_epoll_add_ssock(pollid, src->GetSysSocket(), &events))
                     {
                         cerr << "Failed to add FILE source to poll, "
                             << src->GetSysSocket() << endl;
@@ -565,8 +597,7 @@ int main(int argc, char** argv)
                 switch(tar->uri.type())
                 {
                 case UriParser::SRT:
-                    if (srt_epoll_add_usock(pollid,
-                        tar->GetSRTSocket(), &events))
+                    if (srt_epoll_add_usock(pollid, tar->GetSRTSocket(), &events))
                     {
                         cerr << "Failed to add SRT destination to poll, "
                             << tar->GetSRTSocket() << endl;
@@ -624,36 +655,27 @@ int main(int argc, char** argv)
                     {
                     case SRTS_LISTENING:
                     {
-                        const bool res = (issource) ?
-                            src->AcceptNewClient() : tar->AcceptNewClient();
+                        const bool res = (issource) ? src->AcceptNewClient() : tar->AcceptNewClient();
                         if (!res)
                         {
-                            cerr << "Failed to accept SRT connection"
-                                << endl;
+                            cerr << "Failed to accept SRT connection" << endl;
                             doabort = true;
                             break;
                         }
 
                         srt_epoll_remove_usock(pollid, s);
 
-                        SRTSOCKET ns = (issource) ?
-                            src->GetSRTSocket() : tar->GetSRTSocket();
+                        SRTSOCKET ns = (issource) ? src->GetSRTSocket() : tar->GetSRTSocket();
                         int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
                         if (srt_epoll_add_usock(pollid, ns, &events))
                         {
-                            cerr << "Failed to add SRT client to poll, "
-                                << ns << endl;
+                            cerr << "Failed to add SRT client to poll, " << ns << endl;
                             doabort = true;
                         }
                         else
                         {
                             if (!cfg.quiet)
-                            {
-                                cerr << "Accepted SRT "
-                                    << dirstring
-                                    <<  " connection"
-                                    << endl;
-                            }
+                                cerr << "Accepted SRT " << dirstring <<  " connection" << endl;
 #ifndef _WIN32
                             if (cfg.timeout_mode == 1 && cfg.timeout > 0)
                             {
@@ -678,10 +700,7 @@ int main(int argc, char** argv)
                             if (srcConnected)
                             {
                                 if (!cfg.quiet)
-                                {
-                                    cerr << "SRT source disconnected"
-                                        << endl;
-                                }
+                                    cerr << "SRT source disconnected" << endl;
                                 srcConnected = false;
                             }
                         }
@@ -736,8 +755,7 @@ int main(int argc, char** argv)
                             {
                                 const int events = SRT_EPOLL_IN | SRT_EPOLL_ERR;
                                 // Disable OUT event polling when connected
-                                if (srt_epoll_update_usock(pollid,
-                                    tar->GetSRTSocket(), &events))
+                                if (srt_epoll_update_usock(pollid, tar->GetSRTSocket(), &events))
                                 {
                                     cerr << "Failed to add SRT destination to poll, "
                                         << tar->GetSRTSocket() << endl;
@@ -786,9 +804,7 @@ int main(int argc, char** argv)
                             if (srt_getlasterror(NULL) == SRT_EASYNCRCV)
                                 break;
 
-                            throw std::runtime_error(
-                                string("error: recvmsg: ") + string(srt_getlasterror_str())
-                            );
+                            throw std::runtime_error(string("error: recvmsg: ") + srt_getlasterror_str());
                         }
 
                         if (res == 0 || pkt->payload.empty())
@@ -849,25 +865,3 @@ int main(int argc, char** argv)
 // Class utilities
 
 
-void TestLogHandler(void* opaque, int level, const char* file, int line, const char* area, const char* message)
-{
-    char prefix[100] = "";
-    if ( opaque )
-        strncpy(prefix, (char*)opaque, 99);
-    time_t now;
-    time(&now);
-    char buf[1024];
-    struct tm local = SysLocalTime(now);
-    size_t pos = strftime(buf, 1024, "[%c ", &local);
-
-#ifdef _MSC_VER
-    // That's something weird that happens on Microsoft Visual Studio 2013
-    // Trying to keep portability, while every version of MSVS is a different plaform.
-    // On MSVS 2015 there's already a standard-compliant snprintf, whereas _snprintf
-    // is available on backward compatibility and it doesn't work exactly the same way.
-#define snprintf _snprintf
-#endif
-    snprintf(buf+pos, 1024-pos, "%s:%d(%s)]{%d} %s", file, line, area, level, message);
-
-    cerr << buf << endl;
-}

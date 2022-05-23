@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <map>
 #include <string>
-
+#include "onceToken.h"
 #include "uriparser.hpp"
 
 #ifdef TEST
@@ -22,25 +22,19 @@
 #ifdef TEST1
 #include <iostream>
 #endif
+using std::string;
+std::map<std::string, UriParser::Type> types;
 
-using namespace std;
-
-map<string, UriParser::Type> types;
-
-struct UriParserInit
-{
-    UriParserInit()
-    {
-        types["file"] = UriParser::FILE;
-        types["udp"] = UriParser::UDP;
-        types["tcp"] = UriParser::TCP;
-        types["srt"] = UriParser::SRT;
-        types["rtmp"] = UriParser::RTMP;
-        types["http"] = UriParser::HTTP;
-        types["rtp"] = UriParser::RTP;
-        types[""] = UriParser::UNKNOWN;
-    }
-} g_uriparser_init;
+static onceToken sTypes([]{
+    types["file"] = UriParser::FILE;
+    types["udp"] = UriParser::UDP;
+    types["tcp"] = UriParser::TCP;
+    types["srt"] = UriParser::SRT;
+    types["rtmp"] = UriParser::RTMP;
+    types["http"] = UriParser::HTTP;
+    types["rtp"] = UriParser::RTP;
+    types[""] = UriParser::UNKNOWN;
+});
 
 UriParser::UriParser(const string& strUrl, DefaultExpect exp)
 {
@@ -99,26 +93,6 @@ string UriParser::makeUri()
     return m_origUri;
 }
 
-string UriParser::proto(void) const
-{
-    return m_proto;
-}
-
-UriParser::Type UriParser::type() const
-{
-    return m_uriType;
-}
-
-string UriParser::host(void) const
-{
-    return m_host;
-}
-
-string UriParser::port(void) const
-{
-    return m_port;
-}
-
 unsigned short int UriParser::portno(void) const
 {
     // This returns port in numeric version. Fallback to 0.
@@ -133,11 +107,6 @@ unsigned short int UriParser::portno(void) const
     {
         return 0;
     }
-}
-
-string UriParser::path(void) const
-{
-    return m_path;
 }
 
 string UriParser::queryValue(const string& strKey) const

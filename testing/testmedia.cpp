@@ -2400,7 +2400,7 @@ Epoll_again:
     return MediaPacket(data, mctrl.srctime);
 }
 
-SrtTarget::SrtTarget(std::string host, int port, std::string path, const std::map<std::string,std::string>& par)
+SrtTarget::SrtTarget(std::string host, int port, std::string path, const MapStr& par)
 {
     Init(host, port, path, par, SRT_EPOLL_OUT);
 }
@@ -2520,7 +2520,7 @@ Epoll_again:
     ++counter;
 }
 
-SrtRelay::SrtRelay(std::string host, int port, std::string path, const std::map<std::string,std::string>& par)
+SrtRelay::SrtRelay(std::string host, int port, std::string path, const MapStr& par)
 {
     Init(host, port, path, par, SRT_EPOLL_IN | SRT_EPOLL_OUT);
 }

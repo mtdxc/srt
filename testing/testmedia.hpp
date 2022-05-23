@@ -191,7 +191,7 @@ class SrtSource: public virtual Source, public virtual SrtCommon
     std::string hostport_copy;
 public:
 
-    SrtSource(std::string host, int port, std::string path, const std::map<std::string,std::string>& par);
+    SrtSource(std::string host, int port, std::string path, const MapStr& par);
     SrtSource()
     {
         // Do nothing - create just to prepare for use
@@ -223,7 +223,7 @@ class SrtTarget: public virtual Target, public virtual SrtCommon
 {
 public:
 
-    SrtTarget(std::string host, int port, std::string path, const std::map<std::string,std::string>& par);
+    SrtTarget(std::string host, int port, std::string path, const MapStr& par);
     SrtTarget() {}
 
     int ConfigurePre(SRTSOCKET sock) override;
@@ -246,7 +246,7 @@ public:
 class SrtRelay: public Relay, public SrtSource, public SrtTarget
 {
 public:
-    SrtRelay(std::string host, int port, std::string path, const std::map<std::string,std::string>& par);
+    SrtRelay(std::string host, int port, std::string path, const MapStr& par);
     SrtRelay() {}
 
     int ConfigurePre(SRTSOCKET sock) override
@@ -307,8 +307,8 @@ protected:
     int m_sock = -1;
     srt::sockaddr_any sadr;
     std::string adapter;
-    std::map<std::string, std::string> m_options;
-    void Setup(std::string host, int port, std::map<std::string,std::string> attr);
+    MapStr m_options;
+    void Setup(std::string host, int port, MapStr attr);
     void Error(int err, std::string src);
 
     ~UdpCommon();

@@ -16,7 +16,7 @@
 #include <cstdlib>
 #include "utilities.h"
 
-
+typedef std::map<std::string, std::string> MapStr;
 //++
 // UriParser
 //--
@@ -37,25 +37,25 @@ public:
     virtual ~UriParser(void);
 
     // Some predefined types
-    Type type() const;
+    Type type() const {return m_uriType;}
 
     typedef MapProxy<std::string, std::string> ParamProxy;
 
 // Operations
 public:
     std::string uri() const { return m_origUri; }
-    std::string proto() const;
+    std::string proto() const {return m_proto;}
     std::string scheme() const { return proto(); }
-    std::string host() const;
-    std::string port() const;
+    std::string host() const {return m_host;}
+    std::string port() const {return m_port;}
     unsigned short int portno() const;
     std::string hostport() const { return host() + ":" + port(); }
-    std::string path() const;
+    std::string path() const {return m_path;}
     std::string queryValue(const std::string& strKey) const;
     std::string makeUri();
     ParamProxy operator[](const std::string& key) { return ParamProxy(m_mapQuery, key); }
-    const std::map<std::string, std::string>& parameters() const { return m_mapQuery; }
-    typedef std::map<std::string, std::string>::const_iterator query_it;
+    const MapStr& parameters() const { return m_mapQuery; }
+    typedef MapStr::const_iterator query_it;
 
 private:
     void Parse(const std::string& strUrl, DefaultExpect);
@@ -76,7 +76,7 @@ private:
     Type m_uriType;
     DefaultExpect m_expect;
 
-    std::map<std::string, std::string> m_mapQuery;
+    MapStr m_mapQuery;
 };
 
 //#define TEST1 1

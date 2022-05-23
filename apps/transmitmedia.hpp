@@ -17,8 +17,7 @@
 
 #include "transmitbase.hpp"
 #include <udt.h> // Needs access to CUDTException
-
-using namespace std;
+using std::string;
 
 // Trial version of an exception. Try to implement later an official
 // interruption mechanism in SRT using this.
@@ -41,14 +40,14 @@ protected:
     int m_outgoing_port = 0;
     string m_mode;
     string m_adapter;
-    map<string, string> m_options; // All other options, as provided in the URI
+    MapStr m_options; // All other options, as provided in the URI
     SRTSOCKET m_sock = SRT_INVALID_SOCK;
     SRTSOCKET m_bindsock = SRT_INVALID_SOCK;
     bool IsUsable() { SRT_SOCKSTATUS st = srt_getsockstate(m_sock); return st > SRTS_INIT && st < SRTS_BROKEN; }
     bool IsBroken() { return srt_getsockstate(m_sock) > SRTS_CONNECTED; }
 
 public:
-    void InitParameters(string host, map<string,string> par);
+    void InitParameters(std::string host, MapStr par);
     void PrepareListener(string host, int port, int backlog);
     void StealFrom(SrtCommon& src);
     bool AcceptNewClient();
@@ -61,7 +60,7 @@ public:
 protected:
 
     void Error(string src);
-    void Init(string host, int port, map<string,string> par, bool dir_output);
+    void Init(string host, int port, MapStr par, bool dir_output);
 
     virtual int ConfigurePost(SRTSOCKET sock);
     virtual int ConfigurePre(SRTSOCKET sock);
@@ -87,13 +86,13 @@ class SrtSource: public Source, public SrtCommon
     std::string hostport_copy;
 public:
 
-    SrtSource(std::string host, int port, const std::map<std::string,std::string>& par);
+    SrtSource(std::string host, int port, const MapStr& par);
     SrtSource()
     {
         // Do nothing - create just to prepare for use
     }
 
-    int Read(size_t chunk, MediaPacket& pkt, ostream& out_stats = cout) override;
+    int Read(size_t chunk, MediaPacket& pkt, std::ostream& out_stats = std::cout) override;
 
     /*
        In this form this isn't needed.
@@ -125,7 +124,7 @@ class SrtTarget: public Target, public SrtCommon
 {
 public:
 
-    SrtTarget(std::string host, int port, const std::map<std::string,std::string>& par)
+    SrtTarget(std::string host, int port, const MapStr& par)
     {
         Init(host, port, par, true);
     }
@@ -133,7 +132,7 @@ public:
     SrtTarget() {}
 
     int ConfigurePre(SRTSOCKET sock) override;
-    int Write(const char* data, size_t size, int64_t src_time, ostream &out_stats = cout) override;
+    int Write(const char* data, size_t size, int64_t src_time, std::ostream &out_stats = std::cout) override;
     bool IsOpen() override { return IsUsable(); }
     bool Broken() override { return IsBroken(); }
 
@@ -179,7 +178,7 @@ public:
     string m_host;
     int m_port = 0;
 
-    SrtModel(string host, int port, map<string,string> par);
+    SrtModel(std::string host, int port, MapStr par);
     void Establish(std::string& name);
 };
 

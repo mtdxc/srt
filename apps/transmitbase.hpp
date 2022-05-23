@@ -54,11 +54,7 @@ public:
 class Source: public Location
 {
 public:
-    virtual int  Read(size_t chunk, MediaPacket& pkt, std::ostream &out_stats = std::cout) = 0;
-    virtual bool IsOpen() = 0;
-    virtual bool End() = 0;
     static std::unique_ptr<Source> Create(const std::string& url);
-    virtual void Close() {}
     virtual ~Source() {}
 
     class ReadEOF: public std::runtime_error
@@ -68,6 +64,10 @@ public:
         {
         }
     };
+    virtual int  Read(size_t chunk, MediaPacket& pkt, std::ostream &out_stats = std::cout) = 0;
+    virtual bool IsOpen() = 0;
+    virtual bool End() = 0;
+    virtual void Close() {}
 
     virtual SRTSOCKET GetSRTSocket() const { return SRT_INVALID_SOCK; }
     virtual int GetSysSocket() const { return -1; }
@@ -77,13 +77,14 @@ public:
 class Target: public Location
 {
 public:
+    static std::unique_ptr<Target> Create(const std::string& url);
+    virtual ~Target() {}
+    
     virtual int  Write(const char* data, size_t size, int64_t src_time, std::ostream &out_stats = std::cout) = 0;
     virtual bool IsOpen() = 0;
     virtual bool Broken() = 0;
     virtual void Close() {}
     virtual size_t Still() { return 0; }
-    static std::unique_ptr<Target> Create(const std::string& url);
-    virtual ~Target() {}
 
     virtual SRTSOCKET GetSRTSocket() const { return SRT_INVALID_SOCK; }
     virtual int GetSysSocket() const { return -1; }
