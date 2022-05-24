@@ -28,12 +28,14 @@
 #include <cstdarg>
 #include <errno.h>
 #include <fcntl.h>
+#ifndef _WIN32 
 #include <netdb.h>
+#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <stdint.h>
 
 #include "TSFileTimeReader.hpp"
 #include "SLSLog.hpp"
@@ -73,8 +75,8 @@ int CTSFileTimeReader::open(const char *ts_file_name, bool loop)
     			this, ts_file_name);
     }
 
-    m_rts_fd = ::open(m_file_name, O_RDONLY);
-    if (m_rts_fd <= 0) {
+    m_rts_fd = fopen(m_file_name, "rb");
+    if (!m_rts_fd) {
     	sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::open, open file='%s' failed, '%s'.\n",
     			this, ts_file_name, strerror(errno));
     	return ret;
@@ -90,10 +92,10 @@ int CTSFileTimeReader::open(const char *ts_file_name, bool loop)
 
 int CTSFileTimeReader::close()
 {
-    if (m_rts_fd > 0) {
+    if (m_rts_fd) {
         sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::close, ok, fd=%d, file_name='%s'.",
                 this, m_rts_fd, m_file_name);
-    	::close(m_rts_fd);
+    	fclose(m_rts_fd);
         m_rts_fd = 0;
     }
     return SLS_OK;
@@ -102,7 +104,7 @@ int CTSFileTimeReader::close()
 int  CTSFileTimeReader::get(uint8_t *data, int size, int64_t &tm_ms, bool& jitter)
 {
 	jitter = false;
-    if (m_rts_fd <= 0) {
+    if (!m_rts_fd) {
         sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::get, failed, fd=%d, file_name='%s'.",
                 this, m_rts_fd, m_file_name);
     	return SLS_ERROR;
@@ -110,7 +112,7 @@ int  CTSFileTimeReader::get(uint8_t *data, int size, int64_t &tm_ms, bool& jitte
 
     if (m_array_data.count() == 0) {
     	uint8_t rts_data[RTS_BUF_SIZE];
-    	int n = ::read(m_rts_fd, rts_data, RTS_BUF_SIZE);
+    	int n = fread(rts_data, 1, RTS_BUF_SIZE, m_rts_fd);
     	if (n > 0){
     		m_array_data.put(rts_data, n);
     	} else {
@@ -122,15 +124,15 @@ int  CTSFileTimeReader::get(uint8_t *data, int size, int64_t &tm_ms, bool& jitte
 			sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::get, loop=1, reopen file='%s'.\n",
 					this, m_file_name);
 			//1. read data from header again.
-			::close(m_rts_fd);
-			m_rts_fd = ::open(m_file_name, O_RDONLY);
+			fclose(m_rts_fd);
+			m_rts_fd = fopen(m_file_name, "rb");
 			if (0 == m_rts_fd) {
 				sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::get, open file='%s' failed, '%s'.\n",
 						this, m_file_name, strerror(errno));
 				return SLS_OK;
 			}
 			m_readed_count = 0;
-			n = ::read(m_rts_fd, rts_data, RTS_BUF_SIZE);
+			n = fread(rts_data, 1, RTS_BUF_SIZE, m_rts_fd);
 			if (n > 0){
 				m_array_data.put(data, n);
 			} else {
@@ -187,19 +189,19 @@ int64_t CTSFileTimeReader::generate_rts_file(const char  *ts_file_name)
         return SLS_OK;
     }
 
-    int ts_fd = ::open(ts_file_name, O_RDONLY);
-    if (ts_fd <= 0) {
+    FILE* ts_fd = fopen(ts_file_name, "rb");
+    if (!ts_fd) {
     	sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::generate_rts_file, open file='%s' failed, '%s'.\n",
     			this, ts_file_name, strerror(errno));
     	return ret;
     }
 
-    m_rts_fd = ::open(rts_file_name, O_WRONLY|O_CREAT, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-    if (m_rts_fd <= 0) {
+    m_rts_fd = fopen(rts_file_name, "wb");
+    if (m_rts_fd == NULL) {
     	sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::generate_rts_file, create file='%s' failed, '%s'.\n",
     			this, rts_file_name, strerror(errno));
     	if (ts_fd)
-    	    ::close(ts_fd);
+    	    fclose(ts_fd);
     	return ret;
     }
 
@@ -210,7 +212,7 @@ int64_t CTSFileTimeReader::generate_rts_file(const char  *ts_file_name)
     ts_info ti;
     sls_init_ts_info(&ti);
     while(true) {
-    	int n = read(ts_fd, ts_pack, TS_PACK_LEN);
+    	int n = fread(ts_pack, 1, TS_PACK_LEN, ts_fd);
     	if (n < TS_PACK_LEN)
     		break;
     	sls_parse_ts_info((const uint8_t *)ts_pack, &ti);
@@ -248,8 +250,8 @@ int64_t CTSFileTimeReader::generate_rts_file(const char  *ts_file_name)
                     printf("ts2es: m_array_data.get, wrong n=%d, not %d.\n", n, TS_UDP_LEN);
                     break;
                 }
-                write(m_rts_fd, &rts, sizeof(rts));
-                write(m_rts_fd, rts_data, TS_UDP_LEN);
+                fwrite(&rts, sizeof(rts), 1, m_rts_fd);
+                fwrite(rts_data, TS_UDP_LEN, 1, m_rts_fd);
                 rts += m_udp_duration;
             }
             m_dts = ti.dts;
@@ -280,8 +282,8 @@ int64_t CTSFileTimeReader::generate_rts_file(const char  *ts_file_name)
 			if (n != TS_UDP_LEN) {
 				break;
 			}
-			write(m_rts_fd, &rts, sizeof(rts));
-			write(m_rts_fd, udp_data, TS_UDP_LEN);
+			fwrite(&rts, sizeof(rts), 1, m_rts_fd);
+            fwrite(udp_data, TS_UDP_LEN, 1, m_rts_fd);
 			rts += m_udp_duration;
 		}
 	}
@@ -294,12 +296,12 @@ int64_t CTSFileTimeReader::generate_rts_file(const char  *ts_file_name)
 		    udp_data[i+2] = 0xFF;
 			i += TS_PACK_LEN;
 		}
-		write(m_rts_fd, &rts, sizeof(rts));
-		write(m_rts_fd, udp_data, TS_UDP_LEN);
+		fwrite(&rts, sizeof(rts), 1, m_rts_fd);
+		fwrite(udp_data, TS_UDP_LEN, 1, m_rts_fd);
 	}
 
-    ::close(ts_fd);
-    ::close(m_rts_fd);
+    fclose(ts_fd);
+    fclose(m_rts_fd);
 	sls_log(SLS_LOG_INFO, "[%p]CTSFileTimeReader::generate_rts_file, ok, file='%s'.\n",
 			this, rts_file_name);
 

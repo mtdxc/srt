@@ -26,7 +26,7 @@
 #ifndef _SLSEpollThread_INCLUDE_
 #define _SLSEpollThread_INCLUDE_
 
-#include <srt/srt.h>
+#include <srt.h>
 #include "SLSThread.hpp"
 
 #define MAX_SOCK_COUNT 1024

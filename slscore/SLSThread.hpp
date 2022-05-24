@@ -26,10 +26,9 @@
 #ifndef _SLSThread_INCLUDE_
 #define _SLSThread_INCLUDE_
 
-
+#ifndef _WIN32
 #include <pthread.h>
-
-
+#endif
 
 /**
  * CSLSThread , the base thread class
@@ -38,20 +37,23 @@ class CSLSThread
 {
 public :
 	CSLSThread();
-    ~CSLSThread();
+	~CSLSThread();
 
-    int start();
-    int stop();
+	int start();
+	int stop();
 
-    bool  is_exit();
+	bool  is_exit();
 
 
-    virtual int work();
+	virtual int work();
 protected:
 	bool m_exit;
+#ifdef _WIN32
+	void* m_th_id;
+#else
 	pthread_t m_th_id;
-
-    virtual void    clear();
+#endif
+	virtual void    clear();
 
 private:
 	static void *thread_func(void *);

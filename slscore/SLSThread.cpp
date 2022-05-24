@@ -22,11 +22,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
 #include <errno.h>
 #include <string.h>
-
-
 #include "SLSThread.hpp"
 #include "SLSLog.hpp"
 
@@ -47,16 +44,16 @@ CSLSThread::~CSLSThread()
 int CSLSThread::start()
 {
 	int ret = 0;
-    int err;
-    pthread_t th_id;
-
-    err = pthread_create(&th_id, NULL, thread_func, (void *)this);
-    if (err != 0) {
-    	sls_log(SLS_LOG_ERROR, "[%p]CSLSThread::start, can't create thread, error: %s\n", this, strerror(err));
-        return -1;
-    }
-    m_th_id = th_id;
-    sls_log(SLS_LOG_INFO, "[%p]CSLSThread::start, pthread_create ok, m_th_id=%lld.", this, m_th_id);
+#ifdef _WIN32
+	m_th_id = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)thread_func, this, 0, NULL);
+#else
+	ret = pthread_create(&m_th_id, NULL, thread_func, (void *)this);
+#endif
+	if (ret != 0) {
+		sls_log(SLS_LOG_ERROR, "[%p]CSLSThread::start, can't create thread, error: %s\n", this, strerror(ret));
+		return -1;
+	}
+	sls_log(SLS_LOG_INFO, "[%p]CSLSThread::start, pthread_create ok, m_th_id=%lld.", this, m_th_id);
 
 	return ret;
 
@@ -64,13 +61,17 @@ int CSLSThread::start()
 int CSLSThread::stop()
 {
 	int ret = 0;
-    if (0 == m_th_id) {
-        return ret;
-    }
-    sls_log(SLS_LOG_INFO, "[%p]CSLSThread::stop, m_th_id=%lld.", this, m_th_id);
+	if (0 == m_th_id) {
+		return ret;
+	}
+	sls_log(SLS_LOG_INFO, "[%p]CSLSThread::stop, m_th_id=%lld.", this, m_th_id);
 
-    m_exit = 1;
+	m_exit = 1;
+#ifdef _WIN32
+	WaitForSingleObject(m_th_id, INFINITE);
+#else
 	pthread_join(m_th_id, NULL);
+#endif	
 	m_th_id = 0;
     clear();
 
@@ -93,7 +94,7 @@ void * CSLSThread::thread_func(void * arg)
 	CSLSThread *pThis = (CSLSThread *)arg;
 	if (!pThis)
 	{
-    	sls_log(SLS_LOG_ERROR, "CSLSThread::thread_func, thread arg is null.\n");
+		sls_log(SLS_LOG_ERROR, "CSLSThread::thread_func, thread arg is null.\n");
 	}
 
 	pThis->work();

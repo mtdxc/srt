@@ -27,9 +27,8 @@
 #include <string.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <unistd.h>
 #include <sys/types.h>
-#include <srt/srt.h>
+#include <srt.h>
 
 #include "SLSClient.hpp"
 #include "SLSLog.hpp"
@@ -148,10 +147,9 @@ int CSLSClient::push(const char* url, const char *ts_file_name, bool loop)
 
 int CSLSClient::close()
 {
-
 	int ret = SLS_OK;
 	if (0 != m_out_file) {
-		::close(m_out_file);
+		fclose(m_out_file);
 		m_out_file = 0;
 	}
 	if (0 != m_eid) {
@@ -174,6 +172,7 @@ int CSLSClient::handler()
     }
     return read_data_handler();
 }
+
 int CSLSClient::write_data_handler()
 {
 	uint8_t szData[TS_UDP_LEN];
@@ -271,7 +270,7 @@ int CSLSClient::read_data_handler()
 
         if (0 == m_out_file) {
 			if (strlen(m_out_file_name) > 0) {
-				m_out_file = ::open(m_out_file_name, O_WRONLY|O_CREAT, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
+				m_out_file = fopen(m_out_file_name, "wb");
 			    if (0 == m_out_file) {
 			    	sls_log(SLS_LOG_ERROR, "[%p]CSLSClient::read_data_handler, open file='%s' failed, '%s'.\n", m_out_file_name, strerror(errno));
 			    	return SLS_ERROR;
@@ -279,7 +278,7 @@ int CSLSClient::read_data_handler()
 			}
 		}
         if (0 != m_out_file) {
-            ::write(m_out_file, szData, TS_UDP_LEN);
+            fwrite(szData, TS_UDP_LEN, 1, m_out_file);
         }
         m_data_count += n;
         int64_t cur_tm = sls_gettime_ms();

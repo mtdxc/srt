@@ -152,7 +152,7 @@ int CSLSListener::init_conf_app()
     string strLiveDomain;
     string strUpliveDomain;
     string strTemp;
-    vector<string> domain_players;
+    std::vector<string> domain_players;
     sls_conf_server_t * conf_server;
 
     if (NULL == m_map_puller) {

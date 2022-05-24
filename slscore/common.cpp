@@ -22,31 +22,40 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
+#ifdef _WIN32
+#include <WinSock2.h>
+#include <windows.h>
+#include <time.h>
+#include <WS2tcpip.h>
+#else
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
-
+#include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <unistd.h>
+#endif
 
 #include <cstdarg>
 #include <errno.h>
 #include <fcntl.h>
-#include <netdb.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include <string>
 #include <vector>
 
-
 #include "common.hpp"
-
+#ifdef _WIN32
+#include <direct.h>
+int mkdir(const char* path, int mode) {
+  return _mkdir(path);
+}
+#endif
 
 /**
 * sls_format
@@ -69,8 +78,6 @@ std::string sls_format(const char *pszFmt, ...)
     return str;
 }
 
-#define HAVE_GETTIMEOFDAY 1
-
 int64_t sls_gettime_ms(void)//rturn millisecond
 {
 	return sls_gettime()/1000;
@@ -78,18 +85,16 @@ int64_t sls_gettime_ms(void)//rturn millisecond
 
 int64_t sls_gettime(void)//rturn micro-second
 {
-#if HAVE_GETTIMEOFDAY
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
-#elif HAVE_GETSYSTEMTIMEASFILETIME
-    FILETIME ft;
-    int64_t t;
-    GetSystemTimeAsFileTime(&ft);
-    t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
-    return t / 10 - 11644473600000000; /* Jan 1, 1601 */
+#ifdef _WIN32
+	FILETIME ft;
+	int64_t t;
+	GetSystemTimeAsFileTime(&ft);
+	t = (int64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;
+	return t / 10 - 11644473600000000; /* Jan 1, 1601 */
 #else
-    return -1;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 #endif
 }
 
@@ -108,9 +113,9 @@ void sls_gettime_fmt(char *dst, int64_t cur_time_sec, char *fmt)
     struct tm * timeinfo;
     char timef[32] = {0};
 
-    time (&rawtime);
+    time(&rawtime);
     rawtime = (time_t)cur_time_sec;
-    timeinfo = localtime (&rawtime);
+    timeinfo = localtime(&rawtime);
     strftime(timef, sizeof(timef), fmt, timeinfo);
     strcpy(dst, timef);
     return ;
@@ -342,38 +347,33 @@ int sls_read_pid()
     	printf("no pid file='%s'.\n", pid_file_name);
     	return 0;
     }
-
-    int fd = open(pid_file_name, O_RDONLY);
+    FILE* fd = fopen(pid_file_name, "rb");
     if (0 == fd)  {
     	printf("open file='%s' failed.\n", pid_file_name);
     	return 0;
     }
     char pid[128] = {0};
-    int n = read(fd, pid, sizeof(pid));
+    int n = fread(pid, 1, sizeof(pid), fd);
     ret = atoi(pid);
-    close(fd);
+    fclose(fd);
     return ret;
 }
 
 int sls_write_pid(int pid)
 {
-	struct stat stat_file;
-	int fd = 0;
-
 	if (sls_mkdir_p(pid_path_name) == -1 && errno != EEXIST) {
 	    printf( "mkdir '%s' failed.\n", pid_path_name);
 	    return -1;
 	}
-    fd = open(pid_file_name, O_WRONLY|O_CREAT, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IXOTH);
-
+    FILE* fd = fopen(pid_file_name, "wb");
     if (0 == fd) {
     	printf("open file='%s' failed, '%s'.\n", pid_file_name, strerror(errno));
     	return -1;
     }
     char buf[128] = {0};
     sprintf(buf, "%d", pid);
-    write(fd, buf, strlen(buf));
-    close(fd);
+    fwrite(buf, 1, strlen(buf), fd);
+    fclose(fd);
 	printf("write pid ok, file='%s', pid=%s.\n", pid_file_name, buf);
     return 0;
 
@@ -405,52 +405,50 @@ int sls_send_cmd(const char *cmd)
     if (strcmp(cmd, "reload") == 0) {
     	//reload the existed sls
      	printf("sls_send_cmd ok, reload, sls pid = %d, send SIGUP to it.\n", pid);
+#ifndef _WIN32
     	kill(pid, SIGHUP);
-        return SLS_OK;
+#endif
+      return SLS_OK;
     }
 
 	//ctrl + c
     if (strcmp(cmd, "stop") == 0) {
     	//
      	printf("sls_send_cmd ok, stop, sls pid = %d, send SIGINT to it.\n", pid);
-    	kill(pid, SIGINT);
+#ifndef _WIN32
+        kill(pid, SIGINT);
+#endif
         return SLS_OK;
     }
     return SLS_OK;
 }
 
-#define ADD_VECTOR_END(v,i) (v).push_back((i))
-
-void sls_split_string(std::string str, std::string separator, std::vector<std::string> &result, int count)
+void sls_split_string(const std::string& str, const std::string& separator, std::vector<std::string> &result, int count)
 {
 	result.clear();
-	string::size_type position = str.find(separator);
-	string::size_type lastPosition = 0;
+	size_t lastPosition = 0, position = str.find(separator);
 	uint32_t separatorLength = (uint32_t) separator.length();
 
 	int i = 0;
 	while (position != str.npos) {
-		ADD_VECTOR_END(result, str.substr(lastPosition, position - lastPosition));
+		result.push_back(str.substr(lastPosition, position - lastPosition));
 		lastPosition = position + separatorLength;
 		position = str.find(separator, lastPosition);
 		i ++;
 		if (i == count)
 			break;
 	}
-	ADD_VECTOR_END(result, str.substr(lastPosition, string::npos));
+	result.push_back(str.substr(lastPosition));
 }
 
-std::string sls_find_string(std::vector<std::string> &src, std::string &dst)
+std::string sls_find_string(const std::vector<std::string> &src, const std::string &dst)
 {
-	std::string ret = std::string("");
-	std::vector<std::string>::iterator it;
-    for(it=src.begin(); it!=src.end();) {
-    	std::string str = *it;
-    	it ++;
-    	string::size_type pos = str.find(dst);
+	std::string ret;
+    for(auto it=src.begin(); it!=src.end(); it++) {
+    	auto pos = it->find(dst);
     	if (pos != std::string::npos)
     	{
-    		ret = str;
+    		ret = *it;
     	    break;
     	}
     }
@@ -723,8 +721,6 @@ static int sls_parse_pat(const uint8_t *pat_data, int len, ts_info *ti)
 }
 
 int sls_parse_ts_info(const uint8_t *packet, ts_info *ti){
-
-
     if (packet[0] != TS_SYNC_BYTE) {
         printf( "ts2es: packet[0]=0x%x not 0x47.\n", packet[0]);
         return SLS_ERROR;
@@ -819,7 +815,7 @@ void sls_init_ts_info(ts_info *ti)
         memset(ti->ts_data, 0, TS_UDP_LEN);
 
         for (int i = 0; i < TS_UDP_LEN; ) {
-            ti->ts_data[i] = 0x47;
+            ti->ts_data[i] = TS_SYNC_BYTE;
             ti->ts_data[i+1] = 0x1F;
             ti->ts_data[i+2] = 0xFF;
             ti->ts_data[i+3] = 0x00;

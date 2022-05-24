@@ -30,7 +30,6 @@
 
 #include "common.hpp"
 #include "SLSArray.hpp"
-#include "SLSSyncClock.hpp"
 
 /**
  * CTSFileTimeReader
@@ -50,7 +49,7 @@ public :
 
 private:
     char            m_file_name[URL_MAX_LEN];
-    int             m_rts_fd;
+    FILE*           m_rts_fd;
     int             m_dts_pid;
     int64_t         m_dts;
     int64_t         m_pts;

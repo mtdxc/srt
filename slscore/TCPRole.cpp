@@ -23,7 +23,9 @@
 
 #include <errno.h>
 #include <string.h>
-
+#ifdef _WIN32
+#include <WS2tcpip.h>
+#endif
 #include "TCPRole.hpp"
 #include "SLSLog.hpp"
 
@@ -115,7 +117,7 @@ int CTCPRole::connect(char *host, int port)
     }
 
     struct sockaddr_in servaddr;
-    bzero(&servaddr, sizeof(servaddr));
+    memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
     //inet_pton(AF_INET, host, &servaddr.sin_addr);
@@ -127,7 +129,7 @@ int CTCPRole::connect(char *host, int port)
     	if (errno != EINPROGRESS)
     	{
             sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::connect, failure, m_fd=%d, host=%s, port==%d, errno=%d.", this, m_fd, host, port, errno);
-            ::close(m_fd);
+            closesocket(m_fd);
             m_fd = 0;
             return SLS_ERROR;
     	}
@@ -173,7 +175,7 @@ int CTCPRole::setup()
     int yes = 1;
     int ret = setsockopt(m_fd,
                SOL_SOCKET, SO_REUSEADDR,
-               (void *)&yes, sizeof(yes));
+               (char *)&yes, sizeof(yes));
     if (ret != 0) {
         sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::setup, setsockopt reused failure, m_fd=%d.", this, m_fd);
         return SLS_ERROR;
@@ -189,19 +191,24 @@ int CTCPRole::set_nonblock()
         sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::set_nonblock, m_fd=%d, cant't setup.", this, m_fd);
         return SLS_ERROR;
     }
+#ifdef _WIN32
+    unsigned long ul = 1;
+    ioctlsocket(m_fd, FIONBIO, &ul); //设置为非阻塞模式
+#else
     int opts;
-    opts=fcntl(m_fd, F_GETFL);
-    if(opts<0)
+    opts = fcntl(m_fd, F_GETFL);
+    if (opts < 0)
     {
         sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::set_nonblock, fcntl failure, m_fd=%d.", this, m_fd);
         return SLS_ERROR;
     }
-    opts = opts|O_NONBLOCK;
-    if(fcntl(m_fd, F_SETFL, opts)<0)
+    opts = opts | O_NONBLOCK;
+    if (fcntl(m_fd, F_SETFL, opts) < 0)
     {
         sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::set_nonblock, fcntl set O_NONBLOCK failure, m_fd=%d.", this, m_fd);
         return SLS_ERROR;
     }
+#endif
     sls_log(SLS_LOG_INFO, "[%p]CTCPRole::set_nonblock, set O_NONBLOCK ok, m_fd=%d.", this, m_fd);
     return SLS_OK;
 }
@@ -215,7 +222,7 @@ int CTCPRole::listen(int port, int backlog)
     struct sockaddr_in serverAdd;
     struct sockaddr_in clientAdd;
 
-    bzero(&serverAdd, sizeof(serverAdd));
+    memset(&serverAdd, 0, sizeof(serverAdd));
     serverAdd.sin_family = AF_INET;
     serverAdd.sin_addr.s_addr = htonl(INADDR_ANY);
     serverAdd.sin_port = htons(port);
@@ -245,7 +252,7 @@ int CTCPRole::close() {
         return SLS_ERROR;
     }
     sls_log(SLS_LOG_INFO, "[%p]CTCPRole::close ok, m_fd=%d.", this, m_fd);
-    ::close(m_fd);
+    closesocket(m_fd);
     m_fd = 0;
     m_valid = false;
     return SLS_OK;

@@ -184,6 +184,7 @@ int CSLSPullerManager::set_relay_param(CSLSRelay *relay)
 int  CSLSPullerManager::add_reconnect_stream(char* relay_url)
 {
 	m_reconnect_begin_tm = sls_gettime_ms();
+    return 0;
 }
 
 int CSLSPullerManager::reconnect(int64_t cur_tm_ms)

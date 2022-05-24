@@ -26,10 +26,22 @@
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
+#ifndef _WIN32
 #include <strings.h>
+#endif
 
 #include "SLSLog.hpp"
-#include "SLSLock.hpp"
+
+static char const * LOG_LEVEL_NAME[] = {
+    "FATAL",
+    "ERROR",
+    "WARNING",
+    "INFO",
+    "DEBUG",
+    "TRACE"
+};
+
+static const char APP_NAME[] = "SLS";
 
 CSLSLog* CSLSLog::m_pInstance = NULL;
 
@@ -37,12 +49,17 @@ CSLSLog::CSLSLog()
 {
 	m_level = SLS_LOG_INFO;
 	m_log_file   = NULL;
-    sprintf(log_filename, "");
+    log_filename[0] = 0;
 }
+
 CSLSLog::~CSLSLog()
 {
-
+    if (m_log_file) {
+        fclose(m_log_file);
+        m_log_file = NULL;
+    }
 }
+
 int CSLSLog::create_instance()
 {
     if (!m_pInstance) {
@@ -52,6 +69,7 @@ int CSLSLog::create_instance()
     }
 	return -1;
 }
+
 int CSLSLog::destory_instance()
 {
 	SAFE_DELETE(m_pInstance);
@@ -76,19 +94,18 @@ void CSLSLog::print_log(int level, const char *fmt, va_list vl)
 {
     CSLSLock lock(&m_mutex);
     char buf[4096] = {0};
-    char buf_info[4096] = {0};
     char cur_time[STR_DATE_TIME_LEN] = {0};
     int64_t cur_time_msec = sls_gettime_ms();
-    int64_t cur_time_sec = cur_time_msec/1000;
-    cur_time_msec = cur_time_msec - cur_time_sec*1000;
+    int64_t cur_time_sec = cur_time_msec / 1000;
+    cur_time_msec = cur_time_msec % 1000;
     sls_gettime_fmt(cur_time, cur_time_sec, "%Y-%m-%d %H:%M:%S");
-    vsnprintf (buf , 4095 , fmt , vl);
-    //sprintf(buf_info, "%s %s: %s\n" , cur_time, LOG_LEVEL_NAME[level], buf);
-    sprintf(buf_info, "%s:%03d %s %s: %s\n" , cur_time, (int)cur_time_msec, APP_NAME, LOG_LEVEL_NAME[level], buf);
-    printf(buf_info);
+    int pos = sprintf(buf, "%s:%03d %s %s: " , cur_time, (int)cur_time_msec, APP_NAME, LOG_LEVEL_NAME[level]);
+    pos += vsnprintf(buf + pos, 4095 - pos, fmt, vl);
+    buf[pos++] = '\n';
+    printf(buf);
 
     if (m_log_file) {
-        fwrite(buf_info, strlen(buf_info), 1, m_log_file);
+        fwrite(buf, pos, 1, m_log_file);
     }
 }
 
@@ -114,11 +131,9 @@ void CSLSLog::set_log_file(char * file_name)
     if (!m_pInstance)
         m_pInstance = new CSLSLog();
 
-    if (strlen(m_pInstance->log_filename) == 0) {
-        sprintf(m_pInstance->log_filename, "%s", file_name);
+    if (m_pInstance->log_filename[0] == 0) {
+        strcpy(m_pInstance->log_filename, file_name);
         m_pInstance->m_log_file = fopen(m_pInstance->log_filename, "a");
     }
-
-
 }
 

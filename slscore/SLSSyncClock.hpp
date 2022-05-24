@@ -26,7 +26,7 @@
 #ifndef _SLSSyncLock_INCLUDE_
 #define _SLSSyncLock_INCLUDE_
 
-#include <sys/time.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 /**
@@ -44,7 +44,6 @@ private:
     int64_t   m_begin_ms_rts;
 	int64_t   m_begin_ms_sys;
 	int       m_jitter;
-
 };
 
 

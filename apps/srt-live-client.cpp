@@ -25,7 +25,6 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <unistd.h>
 
 using namespace std;
 
@@ -72,7 +71,6 @@ struct sls_opt_client_t {
 
 int main(int argc, char* argv[])
 {
-    struct sigaction    sigIntHandler;
     sls_opt_client_t    sls_opt;
 
     int ret = SLS_OK;
@@ -125,6 +123,7 @@ int main(int argc, char* argv[])
 			sls_log(SLS_LOG_INFO, "sls_client.play failed, EXIT!");
 			return SLS_ERROR;
 		}
+#ifndef _WIN32
 		for(i = 1; i < sls_opt.worker_count; i++) {
 	        pid_t fpid; //fpid表示fork函数返回的值
 	        fpid=fork();
@@ -137,14 +136,19 @@ int main(int argc, char* argv[])
 	            printf("srt live client, i am the parent process, my process id is %d/n",getpid());
 	        }
 	    }
+#endif	
 	}
 
-
+#ifndef _WIN32
     //ctrl + c to exit
+    struct sigaction    sigIntHandler;
     sigIntHandler.sa_handler = ctrl_c_handler;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
     sigaction(SIGINT, &sigIntHandler, 0);
+#else
+    signal(SIGINT, ctrl_c_handler);
+#endif
 
     sls_log(SLS_LOG_INFO, "\nsrt live client is running...");
 	while(!b_exit)

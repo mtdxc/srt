@@ -26,7 +26,12 @@
 #ifndef _SLSLock_INCLUDE_
 #define _SLSLock_INCLUDE_
 
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#else
 #include <pthread.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -37,19 +42,52 @@
 
 class CSLSMutex
 {
-public :
+public:
     CSLSMutex()
     {
+#ifdef _WIN32
+        InitializeCriticalSection(&m_mutex);
+#else
         pthread_mutex_init(&m_mutex, NULL);
+#endif
     }
     ~CSLSMutex()
     {
+#ifdef _WIN32
+        DeleteCriticalSection(&m_mutex);
+#else
         pthread_mutex_destroy(&m_mutex);
+#endif
     }
-    pthread_mutex_t * get_mutex() {  return &m_mutex; }
+    void lock() {
+#ifdef _WIN32
+        EnterCriticalSection(&m_mutex);
+#else
+        pthread_mutex_lock(&m_mutex);
+#endif
+    }
+    bool tryLock() {
+#ifdef _WIN32
+        return TryEnterCriticalSection(&m_mutex) != FALSE;
+#else
+        if (pthread_mutex_trylock(&m_mutex) != 0)
+            return false;
+        return true;
+#endif
+    }
+    void unlock() {
+#ifdef _WIN32
+        LeaveCriticalSection(&m_mutex);
+#else
+        pthread_mutex_unlock(&m_mutex);
+#endif
+    }
 private:
+#ifdef _WIN32
+    mutable CRITICAL_SECTION m_mutex;
+#else
     pthread_mutex_t m_mutex;
-
+#endif
 };
 
 class CSLSRWLock
@@ -58,46 +96,88 @@ public:
     CSLSRWLock()
     {
         m_inited = false;
+#ifdef _WIN32
+        ::InitializeSRWLock(&m_rwlock);
+        m_inited = true;
+#else
         int ret = pthread_rwlock_init(&m_rwlock, NULL);
         if (0 == ret) {
             m_inited = true;
-        } else {
-            printf("pthread_rwlock_init faild, ret=%d.", ret);;
         }
+        else {
+            printf("pthread_rwlock_init faild, ret=%d.", ret);;
     }
+#endif
+}
     ~CSLSRWLock()
     {
         if (m_inited) {
+#ifdef _WIN32
+            ::ReleaseSRWLockExclusive(&m_rwlock);
+#else
             int ret = pthread_rwlock_destroy(&m_rwlock);
             if (0 != ret)
             {
                 printf("pthread_rwlock_destroy faild, ret=%d.", ret);;
-            }
         }
+#endif
+    }
     }
 
     int try_lock_write()
     {
+#ifdef _WIN32
+        return TryAcquireSRWLockExclusive(&m_rwlock);
+#else
         return pthread_rwlock_trywrlock(&m_rwlock);
+#endif
     }
     int try_lock_read()
     {
+#ifdef _WIN32
+        return TryAcquireSRWLockShared(&m_rwlock);
+#else
         return pthread_rwlock_tryrdlock(&m_rwlock);
+#endif
     }
     int lock_write()
     {
+#ifdef _WIN32
+        AcquireSRWLockExclusive(&m_rwlock);
+        return 0;
+#else
         return pthread_rwlock_wrlock(&m_rwlock);
+#endif
     }
     int lock_read()
     {
+#ifdef _WIN32
+        AcquireSRWLockShared(&m_rwlock);
+        return 0;
+#else
         return pthread_rwlock_rdlock(&m_rwlock);
+#endif
     }
-    int unlock()
-    {
-        return pthread_rwlock_unlock(&m_rwlock);
+    void unlock_read() {
+#ifdef _WIN32
+        ReleaseSRWLockShared(&m_rwlock);
+#else
+        pthread_rwlock_unlock(&m_rwlock);
+#endif
+    }
+    void unlock_write() {
+#ifdef _WIN32
+        ReleaseSRWLockExclusive(&m_rwlock);
+#else
+        pthread_rwlock_unlock(&m_rwlock);
+#endif
     }
 private:
+#ifdef _WIN32
+    SRWLOCK          m_rwlock;
+#else
     pthread_rwlock_t m_rwlock;
+#endif
     bool             m_inited;
 };
 
@@ -112,6 +192,7 @@ public :
         m_mutex = NULL;
         m_clock = NULL;
         m_locked =false;
+        m_write = write;
 	    if (NULL == clock)
 	        return ;
 	    int ret = 0;
@@ -134,13 +215,9 @@ public :
         m_mutex = NULL;
         m_locked =false;
         if (m) {
-            m_mutex = m->get_mutex();
-            int ret = pthread_mutex_lock(m_mutex);
-            if (0 == ret) {
-                m_locked = true;
-            } else {
-                printf("SLS Error: pthread_mutex_lock failure, ret=%d.\n", ret);
-            }
+            m_mutex = m;
+            m->lock();
+            m_locked = true;
         }
 
     }
@@ -148,15 +225,16 @@ public :
     ~CSLSLock()
     {
         if (m_locked && m_mutex)
-            pthread_mutex_unlock(m_mutex);
-        if (m_locked && m_clock)
-            m_clock->unlock();
+           m_mutex->unlock();
+        if (m_locked && m_clock) {
+          m_write ? m_clock->unlock_write() : m_clock->unlock_read();
+        }
     }
 private:
 
-    pthread_mutex_t * m_mutex;
-    CSLSRWLock      * m_clock;
-
+    CSLSMutex* m_mutex;
+    CSLSRWLock* m_clock;
+    bool m_write = false;
     bool m_locked;
 
 };

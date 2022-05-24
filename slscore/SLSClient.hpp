@@ -63,7 +63,7 @@ protected:
     char  m_out_file_name[1024];
 
     int   m_eid;
-    int   m_out_file;
+    FILE*   m_out_file = nullptr;
 
     int64_t m_data_count;
     int64_t m_bit_rate;//kbit/s

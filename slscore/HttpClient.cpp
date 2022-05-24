@@ -497,7 +497,7 @@ int CHttpClient::parse_url()
 
 int CHttpClient::write_http_header(int data_len)
 {
-	std:string http_header;
+	std::string http_header;
 	char data[HTTP_HEADER_SIZE] = {0};
 
 	if (strcmp(m_http_method, "GET") != 0 && strcmp(m_http_method, "POST") != 0) {

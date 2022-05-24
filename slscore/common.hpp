@@ -30,9 +30,6 @@
 #include <stdint.h>
 #include <string>
 #include <vector>
-#include <unistd.h>
-
-using namespace std;
 
 /**********************************************
  * function return type
@@ -64,7 +61,6 @@ using namespace std;
 #define SLSERROR_STREAM_NOT_FOUND   SLSERRTAG(0xF8,'S','T','R') ///< Stream of the StreamID not found
 #define SLSERROR_UNKNOWN            SLSERRTAG( 'U','N','K','N') ///< Unknown error, typically from an external library
 
-
 #define SLSERROR_INVALID_SOCK       SLSERRTAG( 'I','N','V','S') ///< Unknown error, typically from an external library
 /**
  * end
@@ -72,7 +68,13 @@ using namespace std;
 
 //#define SAFE_CREATE(p, class_name) { if (!p) new class_name(); }
 #define SAFE_DELETE(p) {if (p) { delete p; p = NULL; }}
+
+#ifdef _WIN32
+#define msleep Sleep
+#else
 #define msleep(ms) usleep(ms*1000)
+#define closesocket ::close
+#endif
 
 #define TS_PACK_LEN 188
 #define TS_UDP_LEN 1316 //7*188
@@ -80,14 +82,13 @@ using namespace std;
 #define STR_MAX_LEN 1024
 #define URL_MAX_LEN STR_MAX_LEN
 #define STR_DATE_TIME_LEN 32
+
 #define INET_ADDRSTRLEN 16
 #define INET6_ADDRSTRLEN 46
 #define IP_MAX_LEN INET6_ADDRSTRLEN
 
-
-
-int64_t sls_gettime_ms(void);//rturn millisecond
-int64_t sls_gettime(void);//rturn microsecond
+int64_t sls_gettime_ms(void);//return millisecond
+int64_t sls_gettime(void);//return microsecond
 void    sls_gettime_fmt(char *dst, int64_t cur_time_sec, char *fmt);
 void    sls_gettime_default_string(char *cur_time);
 char  * sls_strupper(char * str);
@@ -102,8 +103,8 @@ int sls_write_pid(int pid);
 int sls_remove_pid();
 int sls_send_cmd(const char *cmd);
 
-void sls_split_string(std::string str, std::string separator, std::vector<std::string> &result, int count=-1);
-std::string sls_find_string(std::vector<std::string> &src, std::string &dst);
+void sls_split_string(const std::string& str, const std::string& separator, std::vector<std::string> &result, int count=-1);
+std::string sls_find_string(const std::vector<std::string> &src, const std::string &dst);
 
 
 /*

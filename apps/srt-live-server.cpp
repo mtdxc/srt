@@ -25,8 +25,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
-#include <unistd.h>
-
+//#include <unistd.h>
+#ifdef _WIN32
+#include <process.h>
+#endif
 using namespace std;
 
 #include "SLSLog.hpp"
@@ -74,10 +76,6 @@ static sls_conf_cmd_t  conf_cmd_opt[] = {
 
 int main(int argc, char* argv[])
 {
-    struct sigaction    sigIntHandler;
-    struct sigaction    sigHupHandler;
-    sls_opt_t           sls_opt;
-
     CSLSManager             *sls_manager = NULL;
     std:list <CSLSManager*>  reload_manager_list;
     CHttpClient             *http_stat_client = new CHttpClient;
@@ -92,6 +90,7 @@ int main(int argc, char* argv[])
     usage();
 
     //parse cmd line
+    sls_opt_t           sls_opt;
     memset(&sls_opt, 0, sizeof(sls_opt));
     if (argc > 1) {
         //parset argv
@@ -117,6 +116,9 @@ int main(int argc, char* argv[])
     //CSLSSrt::libsrt_print_error_info();
 
     //ctrl + c to exit
+#ifndef _WIN32
+    struct sigaction    sigIntHandler;
+    struct sigaction    sigHupHandler;
     sigIntHandler.sa_handler = ctrl_c_handler;
     sigemptyset(&sigIntHandler.sa_mask);
     sigIntHandler.sa_flags = 0;
@@ -127,7 +129,10 @@ int main(int argc, char* argv[])
     sigemptyset(&sigHupHandler.sa_mask);
     sigHupHandler.sa_flags = 0;
     sigaction(SIGHUP, &sigHupHandler, 0);
-
+#else
+    signal(SIGINT, ctrl_c_handler);
+    //signal(SIGINT, reload_handler);
+#endif
     //init srt
     CSLSSrt::libsrt_init();
 

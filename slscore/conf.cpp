@@ -33,8 +33,6 @@
 #include "common.hpp"
 #include "SLSLog.hpp"
 
-
-
 sls_conf_base_t  sls_first_conf = {"", NULL, NULL} ;
 sls_runtime_conf_t * sls_runtime_conf_t::first = NULL;
 
@@ -141,9 +139,9 @@ int sls_conf_get_conf_count(sls_conf_base_t *c)
     return count;
 }
 
-vector<string> sls_conf_string_split(const string& str, const string& delim)
+std::vector<string> sls_conf_string_split(const string& str, const string& delim)
 {
-    vector<string> res;
+    std::vector<string> res;
     if("" == str) return res;
 
     char * strs = new char[str.length() + 1] ;
@@ -204,7 +202,7 @@ sls_conf_base_t * sls_conf_create_block_by_name(string n, sls_runtime_conf_t *& 
 }
 //#define new_conf(n, i)\
 //        sls_conf_##n conf_##n##_##i##_info = new sls_conf_##n ;
-int sls_conf_parse_block(ifstream& ifs, int& line, sls_conf_base_t * b, bool& child, sls_runtime_conf_t * p_runtime, int brackets_layers)
+int sls_conf_parse_block(std::ifstream& ifs, int& line, sls_conf_base_t * b, bool& child, sls_runtime_conf_t * p_runtime, int brackets_layers)
 {
     int ret = SLS_ERROR;
     sls_conf_base_t * block = NULL;
@@ -329,7 +327,7 @@ int sls_conf_parse_block(ifstream& ifs, int& line, sls_conf_base_t * b, bool& ch
 
 int sls_conf_open(const char * conf_file)
 {
-    ifstream    ifs(conf_file);
+    std::ifstream ifs(conf_file);
     int         ret = 0;
     int         line = 0;
     bool        child = true;
@@ -357,6 +355,7 @@ int sls_conf_open(const char * conf_file)
 void sls_conf_release(sls_conf_base_t * c)
 {
     sls_conf_base_t * c_b;
+    if (!c) return;
     if (c->child != NULL) {
         c_b = c->child;
         sls_conf_release(c_b);

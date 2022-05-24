@@ -608,6 +608,7 @@ endif()
 
 set (SRT_SRC_HAICRYPT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/haicrypt)
 set (SRT_SRC_SRTCORE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/srtcore)
+set (SRT_SRC_SLSCORE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/slscore)
 set (SRT_SRC_COMMON_DIR ${CMAKE_CURRENT_SOURCE_DIR}/common)
 set (SRT_SRC_TOOLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tools)
 set (SRT_SRC_TEST_DIR ${CMAKE_CURRENT_SOURCE_DIR}/test)
@@ -653,7 +654,7 @@ endif()
 
 # This is obligatory include directory for all targets. This is only
 # for private headers. Installable headers should be exclusively used DIRECTLY.
-include_directories(${SRT_SRC_COMMON_DIR} ${SRT_SRC_SRTCORE_DIR} ${SRT_SRC_HAICRYPT_DIR})
+include_directories(${SRT_SRC_COMMON_DIR} ${SRT_SRC_SRTCORE_DIR} ${SRT_SRC_HAICRYPT_DIR} ${SRT_SRC_SLSCORE_DIR})
 
 if (ENABLE_LOGGING)
 	list(APPEND SRT_EXTRA_CFLAGS "-DENABLE_LOGGING=1")
@@ -1169,6 +1170,13 @@ if (ENABLE_APPS)
 	set (VIRTUAL_srtsupport $<TARGET_OBJECTS:srtsupport_virtual>)
 
 	# Applications
+	file(GLOB SOURCES_sls "slscore/*")
+	#AUX_SOURCE_DIRECTORY(slscore SOURCES_sls)
+	add_library(sls_virtual OBJECT ${SOURCES_sls})
+	srt_add_application(srt-live-server ${VIRTUAL_srtsupport})
+	target_link_libraries(srt-live-server sls_virtual)
+	srt_add_application(srt-live-client ${VIRTUAL_srtsupport})
+	target_link_libraries(srt-live-client sls_virtual)
 
 	srt_add_application(srt-live-transmit ${VIRTUAL_srtsupport})
 	if (DEFINED EXTRA_stransmit)

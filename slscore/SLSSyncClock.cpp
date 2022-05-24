@@ -23,7 +23,11 @@
  */
 
 #include <stdio.h>
-
+#ifdef _WIN32
+#include <windows.h> // for sleep
+#else
+#include <unistd.h>
+#endif
 #include "SLSSyncClock.hpp"
 #include "common.hpp"
 

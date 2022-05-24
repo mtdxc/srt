@@ -31,9 +31,7 @@
 #include <stdint.h>
 #include <vector>
 #include <string>
-
-using namespace std;
-
+using std::string;
 /*
  * conf file structure
  * srt[root]
@@ -179,8 +177,6 @@ int sls_parse_argv(int argc, char * argv[], sls_opt_t * sls_opt, sls_conf_cmd_t 
 
 sls_conf_cmd_t  * sls_conf_find(const char *n, sls_conf_cmd_t *cmd, int size);
 sls_conf_base_t * sls_conf_get_root_conf();
-vector<string>    sls_conf_string_split(const string& str, const string& delim);
-
-
+std::vector<string>    sls_conf_string_split(const string& str, const string& delim);
 
 #endif

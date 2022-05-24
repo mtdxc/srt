@@ -38,17 +38,6 @@
 #define SLS_LOG_INFO      3
 #define SLS_LOG_DEBUG     4
 #define SLS_LOG_TRACE     5
-static char const * LOG_LEVEL_NAME[] = {
-		"FATAL",
-		"ERROR",
-		"WARNING",
-		"INFO",
-		"DEBUG",
-		"TRACE"
-};
-
-
-static const char APP_NAME[] = "SLS";
 
 #define sls_log CSLSLog::log
 #define sls_set_log_level CSLSLog::set_log_level
