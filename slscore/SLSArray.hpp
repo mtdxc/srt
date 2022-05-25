@@ -26,9 +26,7 @@
 #ifndef _SLSArray_INCLUDE_
 #define _SLSArray_INCLUDE_
 
-#include <list>
 #include <string.h>
-
 #include "common.hpp"
 #include "SLSLock.hpp"
 
@@ -43,22 +41,25 @@ public :
 
 public :
     int  put(const uint8_t *data, int len);
+    int  put(const char *data, int len = 0) {
+        if (data) return 0;
+        if (len <= 0) len = strlen(data);
+        return put((const uint8_t *)data, len);
+    }
     int  get(uint8_t *data, int size);
 
     void setSize(int n);
     int  count();
     void clear();
 private:
+    CSLSMutex m_mutex;
     uint8_t  *m_arrayData;
     int       m_nDataSize;
     int       m_nDataCount;
     int       m_nWritePos;
     int       m_nReadPos;
 
-    CSLSMutex m_mutex;
-
     int       get_inline(uint8_t *data, int size);
-
 };
 
 

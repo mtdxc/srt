@@ -23,9 +23,23 @@
 
 #include <errno.h>
 #include <string.h>
+#include <ctype.h>
+#include <errno.h>
+
 #ifdef _WIN32
+#include <WinSock2.h>
 #include <WS2tcpip.h>
+#else
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
 #endif
+
+#include <fcntl.h>
+#include <stdio.h>
 #include "TCPRole.hpp"
 #include "SLSLog.hpp"
 
@@ -45,6 +59,7 @@ CTCPRole::CTCPRole()
     strcpy(m_remote_host, "");
     sprintf(m_role_name, "tcp_role");
 }
+
 CTCPRole::~CTCPRole()
 {
     close();
@@ -64,21 +79,18 @@ int CTCPRole::write(const char * buf, int size)
 	if (0 >= len) {
         sls_log(SLS_LOG_INFO, "[%p]CTCPRole::read, len=%d, errno=%d, err='%s'",
         		this, len, errno, strerror(errno));
-
 	}
     return len;
 }
 
 int CTCPRole::read(char * buf, int size)
 {
-	int len = 0;
-	len = recv(m_fd, buf, size, 0);
+	int len = recv(m_fd, buf, size, 0);
 	if (len <= 0){
         sls_log(SLS_LOG_TRACE, "[%p]CTCPRole::read, len=%d, errno=%d, err='%s'.",
         		this, len, errno, strerror(errno));
 		if (errno != EAGAIN ) {
-	        sls_log(SLS_LOG_INFO, "[%p]CTCPRole::read, invalid tcp.",
-	        		this);
+	        sls_log(SLS_LOG_INFO, "[%p]CTCPRole::read, invalid tcp.", this);
 			m_valid = false;
 		}
 	}
@@ -195,8 +207,7 @@ int CTCPRole::set_nonblock()
     unsigned long ul = 1;
     ioctlsocket(m_fd, FIONBIO, &ul); //设置为非阻塞模式
 #else
-    int opts;
-    opts = fcntl(m_fd, F_GETFL);
+    int opts = fcntl(m_fd, F_GETFL);
     if (opts < 0)
     {
         sls_log(SLS_LOG_ERROR, "[%p]CTCPRole::set_nonblock, fcntl failure, m_fd=%d.", this, m_fd);
@@ -259,17 +270,17 @@ int CTCPRole::close() {
 }
 
 
-char * CTCPRole::get_role_name()
+char* CTCPRole::get_role_name()
 {
     return m_role_name;
 }
 
-bool   CTCPRole::is_valid()
+bool CTCPRole::is_valid()
 {
     return m_valid;
 }
 
-int    CTCPRole::get_fd()
+int CTCPRole::get_fd()
 {
 	return m_fd;
 }

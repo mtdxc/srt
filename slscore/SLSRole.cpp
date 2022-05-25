@@ -651,10 +651,10 @@ int CSLSRole::check_http_passed()
 	    return SLS_ERROR;
 	}
 
-	int ret = strcmp(re->m_response_code.c_str(), HTTP_RESPONSE_CODE_200);
+	int ret = strcmp(re->code.c_str(), HTTP_RESPONSE_CODE_200);
     if (0 == ret) {
         sls_log(SLS_LOG_INFO, "[%p]CSLSRole::check_http_client_response, http finished, %s, http_url='%s', response_code=%s, response='%s'.",
-    					this, m_role_name, m_http_url, re->m_response_code.c_str(), re->m_response_content.c_str());
+    					this, m_role_name, m_http_url, re->code.c_str(), re->content.c_str());
 		m_http_client->close();
 		delete m_http_client;
 		m_http_client = NULL;
@@ -662,7 +662,7 @@ int CSLSRole::check_http_passed()
 	    return SLS_OK;
     } else {
         sls_log(SLS_LOG_INFO, "[%p]CSLSPlayer::check_http_client_response, http refused, invalid %s http_url='%s', response_code=%s, response='%s'.",
-						this, m_role_name, m_http_url, re->m_response_code.c_str(), re->m_response_content.c_str());
+						this, m_role_name, m_http_url, re->code.c_str(), re->content.c_str());
 		m_http_client->close();
 		delete m_http_client;
 		m_http_client = NULL;

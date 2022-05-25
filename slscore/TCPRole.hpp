@@ -24,28 +24,6 @@
 #ifndef _TCPRole_INCLUDE_
 #define _TCPRole_INCLUDE_
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
-#include <errno.h>
-#include <sys/types.h>
-#ifdef _WIN32
-#include <WinSock2.h>
-#else
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <sys/ioctl.h>
-#endif
-#include <stdarg.h>
-#include <fcntl.h>
-#include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
-
 #include "conf.hpp"
 
 typedef struct DATA_PARAM {

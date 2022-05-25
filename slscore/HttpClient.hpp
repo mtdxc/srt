@@ -43,10 +43,11 @@ enum HTTP_CALLBACK_TYPE {
 
 typedef int (*HTTP_CALLBACK)(void *p, HTTP_CALLBACK_TYPE type, void *v, void* context);
 typedef struct HTTP_RESPONSE_INFO {
-	std::vector<std::string> m_response_header;
-	std::string              m_response_code;
-	std::string              m_response_content;
-	int                      m_response_content_length;
+	std::vector<std::string> headers;
+	std::string              code;
+	std::string              content;
+	int                      content_length;
+    void clear() { headers.clear(); code = content = ""; content_length = -1; }
 };
 /**
  * CHttpClient
@@ -68,7 +69,7 @@ public :
 
     void        set_id(uint32_t client_id);
     void        set_timeout(int v);
-    void        set_stage_callback(HTTP_CALLBACK callback, void *context);
+    void        set_callback(HTTP_CALLBACK callback, void *context);
 
     int         check_timeout(int64_t cur_tm_ms=0);
     int         check_repeat(int64_t cur_tm_ms=0);
@@ -96,18 +97,12 @@ protected:
     std::string m_request_data;
 
     HTTP_RESPONSE_INFO       m_response_info;
-    /*
-	std::vector<std::string> m_response_header;
-	std::string              m_response_code;
-	std::string              m_response_content;
-	int                      m_response_content_length;
-    */
 	HTTP_CALLBACK            m_callback;
 	void                    *m_callback_context;
 
 	int         parse_url();
 	int         write_http_header(int data_len);
-	int         write_string(std::string *str);
+	int         write_string(const std::string& str);
 	int         parse_http_response(std::string &response);
     virtual int generate_http_request();
     void        get_request_data();
