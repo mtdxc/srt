@@ -44,20 +44,16 @@ public :
 
 	bool  is_exit();
 
-
 	virtual int work();
 protected:
-	bool m_exit;
+    virtual void clear();
+
+    bool m_exit;
 #ifdef _WIN32
 	void* m_th_id;
 #else
 	pthread_t m_th_id;
 #endif
-	virtual void    clear();
-
-private:
-	static void *thread_func(void *);
-
 };
 
 

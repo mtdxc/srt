@@ -29,6 +29,7 @@
 
 #include "SLSRole.hpp"
 #include "SLSLog.hpp"
+#include "HttpClient.hpp"
 
 
 /**
@@ -68,17 +69,17 @@ CSLSRole::CSLSRole()
     m_need_reconnect  = false;
     m_http_client     = NULL;
 
-    sprintf(m_record_hls, "off");//default off
+    strcpy(m_record_hls, "off");//default off
     m_record_hls_ts_fd   = 0;
     memset(m_record_hls_ts_filename, 0, URL_MAX_LEN);
     m_record_hls_vod_fd   = 0;
     memset(m_record_hls_vod_filename, 0, URL_MAX_LEN);
-    sprintf(m_record_hls_path, "./vod");//default current path
+    strcpy(m_record_hls_path, "./vod");//default current path
     m_record_hls_begin_tm_ms = 0;
     m_record_hls_segment_duration   = 10;//default 10s
     m_record_hls_target_duration    = m_record_hls_segment_duration;
 
-	sprintf(m_role_name, "role");
+	strcpy(m_role_name, "role");
 }
 
 CSLSRole::~CSLSRole()
@@ -103,7 +104,6 @@ int CSLSRole::uninit()
 {
 	int ret = 0;
 	if (NULL != m_http_client) {
-		m_http_client->close();
 		delete m_http_client;
 		m_http_client = NULL;
 	}

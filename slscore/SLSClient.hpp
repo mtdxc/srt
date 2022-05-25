@@ -26,11 +26,9 @@
 #ifndef _SLSClient_INCLUDE_
 #define _SLSClient_INCLUDE_
 
-#include <list>
-
 #include "SLSRelay.hpp"
 #include "TSFileTimeReader.hpp"
-
+#include "SLSSyncClock.hpp"
 
 /**
  * CSLSClient

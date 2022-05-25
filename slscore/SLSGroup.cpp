@@ -26,7 +26,6 @@
 #include <errno.h>
 #include <string.h>
 
-
 #include "SLSGroup.hpp"
 #include "SLSLog.hpp"
 

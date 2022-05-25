@@ -23,10 +23,6 @@
  */
 
 
-#include <errno.h>
-#include <string.h>
-
-
 #include "SLSRoleList.hpp"
 #include "SLSLog.hpp"
 #include "SLSLock.hpp"
@@ -38,6 +34,7 @@
 CSLSRoleList::CSLSRoleList()
 {
 }
+
 CSLSRoleList::~CSLSRoleList()
 {
 }
@@ -66,15 +63,14 @@ void CSLSRoleList::erase()
 {
     CSLSLock lock(&m_mutex);
     sls_log(SLS_LOG_TRACE, "[%p]CSLSRoleList::erase, list.count=%d", this, m_list_role.size());
-    std::list<CSLSRole * >::iterator it_erase;
-    for (std::list<CSLSRole * >::iterator it = m_list_role.begin(); it != m_list_role.end();)
+    for (std::list<CSLSRole* >::iterator it = m_list_role.begin(); it != m_list_role.end();)
     {
-        CSLSRole * role = *it;
+        CSLSRole* role = *it;
         if (role) {
         	role->uninit();
             delete role;
         }
-        it ++;
+        it++;
     }
     m_list_role.clear();
 }

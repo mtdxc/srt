@@ -205,7 +205,7 @@ int CTCPRole::set_nonblock()
     }
 #ifdef _WIN32
     unsigned long ul = 1;
-    ioctlsocket(m_fd, FIONBIO, &ul); //设置为非阻塞模式
+    ioctlsocket(m_fd, FIONBIO, &ul);
 #else
     int opts = fcntl(m_fd, F_GETFL);
     if (opts < 0)

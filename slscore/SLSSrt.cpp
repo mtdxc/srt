@@ -47,12 +47,12 @@ CSLSSrt::CSLSSrt()
     m_sc.fd   = 0;
     m_sc.eid  = 0;
     m_sc.latency = 20;
-
     m_sc.backlog = 1024;
+
     memset(m_peer_name, 0, sizeof(m_peer_name));
     m_peer_port = 0;
-
 }
+
 CSLSSrt::~CSLSSrt()
 {
 }
@@ -99,7 +99,6 @@ SRTS_NONEXIST:
 #define set_error_map(k)\
         map_error[k] = std::string(#k);
 
-    char szBuf[1024] = {0};
     std::map<int, std::string> map_error;
 
     set_error_map(SRTS_INIT);
@@ -123,13 +122,10 @@ SRTS_NONEXIST:
     printf("--------srt error--------\n");
     std::map<int, std::string>::iterator it;
     for(it=map_error.begin(); it!=map_error.end(); ++it) {
-        sprintf(szBuf, "%d: %s\n", it->first, it->second.c_str());
-        printf(szBuf);
+        printf("%d: %s\n", it->first, it->second.c_str());
     }
     printf("----------end------------\n");
     map_error.clear();
-
-
 }
 
 int CSLSSrt::libsrt_neterrno()
@@ -163,8 +159,8 @@ int CSLSSrt::libsrt_setup(int port)
 
     hints.ai_family = AF_INET;//AF_UNSPEC;
     hints.ai_socktype = SOCK_DGRAM;
-    snprintf(portstr, sizeof(portstr), "%d", s->port);
     hints.ai_flags |= AI_PASSIVE;
+    snprintf(portstr, sizeof(portstr), "%d", s->port);
     ret = getaddrinfo(s->hostname[0] ? s->hostname : NULL, portstr, &hints, &ai);
     if (ret) {
         sls_log(SLS_LOG_ERROR,
@@ -235,7 +231,6 @@ int CSLSSrt::libsrt_accept()
     struct sockaddr_in scl;
     int sclen = sizeof(scl);
     char ip[30] = {0};
-    struct sockaddr_in * addrtmp;
 
     int new_sock = srt_accept(m_sc.fd, (struct sockaddr*)&scl, &sclen);//NULL, NULL);//(sockaddr*)&scl, &sclen);
     if (new_sock == SRT_INVALID_SOCK) {
@@ -244,10 +239,9 @@ int CSLSSrt::libsrt_accept()
                    this, m_sc.fd, err_no);
         return SLS_ERROR;
     }
-    addrtmp = (struct sockaddr_in *)&scl;
-    inet_ntop(AF_INET, &addrtmp->sin_addr, ip, sizeof(ip));
+    inet_ntop(AF_INET, &scl.sin_addr, ip, sizeof(ip));
     sls_log(SLS_LOG_INFO, "[%p]CSLSSrt::libsrt_accept ok, new sock=%d, %s:%d.",
-               this, new_sock, ip, ntohs(addrtmp->sin_port));
+               this, new_sock, ip, ntohs(scl.sin_port));
 
     return new_sock;
 }
@@ -312,11 +306,10 @@ int CSLSSrt::libsrt_socket_nonblock(int enable)
 int CSLSSrt::libsrt_split_sid(char *sid, char *host, char *app, char *name)
 {
     int i = 0;
-    char *p, *p1 ;
-    p1 = sid;
+    char *p1 = sid;
 
     //host
-    p = strchr(p1, '/');
+    char* p = strchr(p1, '/');
     if (p) {
         strncpy(host, (const char *)p1, p - p1);
         p1 = p+1;
@@ -341,8 +334,7 @@ int CSLSSrt::libsrt_split_sid(char *sid, char *host, char *app, char *name)
 
 int CSLSSrt::libsrt_read(char *buf, int size)
 {
-    int ret;
-    ret = srt_recvmsg(m_sc.fd, buf, size);
+    int ret = srt_recvmsg(m_sc.fd, buf, size);
     if (ret < 0) {
         int err_no = libsrt_neterrno();
         sls_log(SLS_LOG_WARNING, "[%p]CSLSSrt::libsrt_read failed, sock=%d, ret=%d, err_no=%d.",
@@ -353,8 +345,7 @@ int CSLSSrt::libsrt_read(char *buf, int size)
 
 int CSLSSrt::libsrt_write(const char *buf, int size)
 {
-    int ret;
-    ret = srt_sendmsg(m_sc.fd, buf, size, -1, 0);
+    int ret = srt_sendmsg(m_sc.fd, buf, size, -1, 0);
     if (ret < 0) {//SRTS_BROKEN
         int err_no = libsrt_neterrno();
         sls_log(SLS_LOG_WARNING, "[%p]CSLSSrt::libsrt_write failed, sock=%d, ret=%d, errno=%d.",

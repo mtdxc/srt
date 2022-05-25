@@ -25,8 +25,6 @@
 
 #include <errno.h>
 #include <string.h>
-
-
 #include "SLSEpollThread.hpp"
 #include "SLSLog.hpp"
 #include "common.hpp"

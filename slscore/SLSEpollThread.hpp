@@ -26,9 +26,7 @@
 #ifndef _SLSEpollThread_INCLUDE_
 #define _SLSEpollThread_INCLUDE_
 
-#include <srt.h>
 #include "SLSThread.hpp"
-
 #define MAX_SOCK_COUNT 1024
 
 /**
@@ -48,11 +46,11 @@ public :
 protected:
     virtual int     handler();
 
-    int         add_to_epoll(int fd, bool write) ;
+    // int add_to_epoll(int fd, bool write) ;
 
     int        m_eid;
-    SRTSOCKET  m_read_socks[MAX_SOCK_COUNT];
-    SRTSOCKET  m_write_socks[MAX_SOCK_COUNT];
+    int  m_read_socks[MAX_SOCK_COUNT];
+    int  m_write_socks[MAX_SOCK_COUNT];
 
 };
 

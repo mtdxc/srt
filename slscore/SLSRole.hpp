@@ -28,16 +28,14 @@
 
 #include <map>
 
-
 #include "SLSRole.hpp"
 #include "SLSSrt.hpp"
 #include "SLSMapData.hpp"
 #include "conf.hpp"
 #include "SLSLock.hpp"
 #include "common.hpp"
-#include "HttpClient.hpp"
 
-
+class CHttpClient;
 enum SLS_ROLE_STATE {
     SLS_RS_UNINIT = 0,
     SLS_RS_INITED = 1,
@@ -54,7 +52,6 @@ class CSLSRole
 public :
 	CSLSRole();
 	virtual ~CSLSRole();
-
 
     virtual int init();
     virtual int uninit();

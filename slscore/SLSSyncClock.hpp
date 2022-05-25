@@ -27,7 +27,6 @@
 #define _SLSSyncLock_INCLUDE_
 
 #include <stdint.h>
-#include <sys/types.h>
 
 /**
  * CSLSSyncClock

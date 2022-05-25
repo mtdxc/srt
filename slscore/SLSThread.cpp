@@ -36,9 +36,22 @@ CSLSThread::CSLSThread()
 	m_exit     = 0;
 	m_th_id     = 0;
 }
+
 CSLSThread::~CSLSThread()
 {
 	stop();
+}
+
+void* thread_func(void * arg)
+{
+    CSLSThread *pThis = (CSLSThread *)arg;
+    if (!pThis)
+    {
+        sls_log(SLS_LOG_ERROR, "CSLSThread::thread_func, thread arg is null.\n");
+    }
+
+    pThis->work();
+    return NULL;
 }
 
 int CSLSThread::start()
@@ -56,8 +69,8 @@ int CSLSThread::start()
 	sls_log(SLS_LOG_INFO, "[%p]CSLSThread::start, pthread_create ok, m_th_id=%lld.", this, m_th_id);
 
 	return ret;
-
 }
+
 int CSLSThread::stop()
 {
 	int ret = 0;
@@ -76,7 +89,6 @@ int CSLSThread::stop()
     clear();
 
 	return ret;
-
 }
 
 void CSLSThread::clear()
@@ -88,19 +100,6 @@ bool  CSLSThread::is_exit()
 {
 	return m_exit == 1;
 }
-
-void * CSLSThread::thread_func(void * arg)
-{
-	CSLSThread *pThis = (CSLSThread *)arg;
-	if (!pThis)
-	{
-		sls_log(SLS_LOG_ERROR, "CSLSThread::thread_func, thread arg is null.\n");
-	}
-
-	pThis->work();
-	return NULL;
-}
-
 
 int CSLSThread::work()
 {
