@@ -26,7 +26,6 @@
 #include <errno.h>
 #include <string.h>
 
-
 #include "SLSPublisher.hpp"
 #include "SLSPlayer.hpp"
 #include "SLSLog.hpp"
@@ -45,8 +44,7 @@ CSLSPublisher::CSLSPublisher()
     m_is_write             = 0;
     m_map_publisher        = NULL;
 
-    sprintf(m_role_name, "publisher");
-
+    strcpy(m_role_name, "publisher");
 }
 
 CSLSPublisher::~CSLSPublisher()

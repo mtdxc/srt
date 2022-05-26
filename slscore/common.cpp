@@ -55,6 +55,7 @@
 int mkdir(const char* path, int mode) {
   return _mkdir(path);
 }
+#define vscprintf _vscprintf
 #endif
 
 /**
@@ -63,18 +64,15 @@ int mkdir(const char* path, int mode) {
 std::string sls_format(const char *pszFmt, ...)
 {
     std::string str;
-    /*
     va_list args;
     va_start(args, pszFmt);
     {
         int nLength = vscprintf(pszFmt, args);
         nLength += 1;  //include \0
-        std::vector<char> vectorChars(nLength);
-        vsnprintf(vectorChars.data(), nLength, pszFmt, args);
-        str.assign(vectorChars.data());
+        str.resize(nLength);
+        vsnprintf(&str[0], nLength, pszFmt, args);
     }
     va_end(args);
-    */
     return str;
 }
 
@@ -109,13 +107,12 @@ void sls_gettime_default_string(char *cur_time)
 
 void sls_gettime_fmt(char *dst, int64_t cur_time_sec, char *fmt)
 {
-    time_t rawtime;
-    struct tm * timeinfo;
-    char timef[32] = {0};
-
+    time_t rawtime;    
     time(&rawtime);
     rawtime = (time_t)cur_time_sec;
-    timeinfo = localtime(&rawtime);
+
+    char timef[32] = {0};
+    struct tm * timeinfo = localtime(&rawtime);
     strftime(timef, sizeof(timef), fmt, timeinfo);
     strcpy(dst, timef);
     return ;
@@ -133,11 +130,8 @@ char * sls_strupper(char * str)
 uint32_t sls_hash_key(const char *data, int len)
 {
 	//copy form ngx
-    uint32_t  i, key;
-
-    key = 0;
-
-    for (i = 0; i < len; i++) {
+    uint32_t  key = 0;
+    for (int i = 0; i < len; i++) {
         key = sls_hash(key, data[i]);
     }
     return key;
@@ -145,43 +139,39 @@ uint32_t sls_hash_key(const char *data, int len)
 
 int sls_gethostbyname(const char *hostname, char *ip)
 {
-    char   *ptr, **pptr;
-    struct hostent *hptr;
-    char   str[32];
-    ptr = (char *)hostname;
     int ret = SLS_ERROR;
+    struct hostent *hptr = gethostbyname(hostname);
+    if(hptr == NULL)
+    {
+        printf("sls_gethostbyname: gethostbyname error for host:%s\n", hostname);
+        return ret;
+    }
 
-    if((hptr = gethostbyname(ptr)) == NULL)
-     {
-         printf("sls_gethostbyname: gethostbyname error for host:%s\n", ptr);
-         return ret;
-     }
-
+    char   **pptr;
+    char   str[32];
 /*
     printf("official hostname:%s\n",hptr->h_name);
      for(pptr = hptr->h_aliases; *pptr != NULL; pptr++)
          printf(" alias:%s\n",*pptr);
 */
 
-     switch(hptr->h_addrtype)
-     {
-         case AF_INET:
-         case AF_INET6:
-             //pptr=hptr->h_addr_list;
-             //for(; *pptr!=NULL; pptr++)
-             //    printf(" address:%s\n",
-             //           inet_ntop(hptr->h_addrtype, *pptr, str, sizeof(str)));
+    switch(hptr->h_addrtype)
+    {
+        case AF_INET:
+        case AF_INET6:
+            // for(pptr=hptr->h_addr_list; *pptr!=NULL; pptr++)
+            //    printf(" address:%s\n", inet_ntop(hptr->h_addrtype, *pptr, str, sizeof(str)));
 
-        	 //copy the 1st ip
-             strcpy(ip, inet_ntop(hptr->h_addrtype, hptr->h_addr, str, sizeof(str)));
-             ret = SLS_OK;
-         break;
-         default:
-             printf("sls_gethostbyname: unknown address type\n");
-         break;
-     }
+            //copy the 1st ip
+            strcpy(ip, inet_ntop(hptr->h_addrtype, hptr->h_addr, str, sizeof(str)));
+            ret = SLS_OK;
+        break;
+        default:
+            printf("sls_gethostbyname: unknown address type\n");
+        break;
+    }
 
-     return ret;
+    return ret;
  }
 
 static void av_str_replace(char *buf, const char dst, const char ch)
@@ -194,8 +184,8 @@ static void av_str_replace(char *buf, const char dst, const char ch)
         *p++ = ch;
     }
 }
-static size_t max_alloc_size= 1024000;// max 1M
 
+static size_t max_alloc_size= 1024000;// max 1M
 static void *av_malloc(size_t size)
 {
     void *ptr = NULL;
@@ -248,6 +238,7 @@ static void *av_malloc(size_t size)
         memset(ptr, 0, size);
     return ptr;
 }
+
 static void av_free(void *arg)
 {
     //memcpy(arg, &(void *){ NULL }, sizeof(arg));
@@ -352,9 +343,7 @@ int sls_read_pid()
     	printf("open file='%s' failed.\n", pid_file_name);
     	return 0;
     }
-    char pid[128] = {0};
-    int n = fread(pid, 1, sizeof(pid), fd);
-    ret = atoi(pid);
+    fscanf(fd, "%d", &ret);
     fclose(fd);
     return ret;
 }
@@ -370,11 +359,9 @@ int sls_write_pid(int pid)
     	printf("open file='%s' failed, '%s'.\n", pid_file_name, strerror(errno));
     	return -1;
     }
-    char buf[128] = {0};
-    sprintf(buf, "%d", pid);
-    fwrite(buf, 1, strlen(buf), fd);
+    fprintf(fd, "%d", pid);
     fclose(fd);
-	printf("write pid ok, file='%s', pid=%s.\n", pid_file_name, buf);
+	printf("write pid ok, file='%s', pid=%d.\n", pid_file_name, pid);
     return 0;
 
 }
@@ -408,7 +395,7 @@ int sls_send_cmd(const char *cmd)
 #ifndef _WIN32
     	kill(pid, SIGHUP);
 #endif
-      return SLS_OK;
+        return SLS_OK;
     }
 
 	//ctrl + c

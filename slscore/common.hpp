@@ -92,6 +92,7 @@ int64_t sls_gettime(void);//return microsecond
 void    sls_gettime_fmt(char *dst, int64_t cur_time_sec, char *fmt);
 void    sls_gettime_default_string(char *cur_time);
 char  * sls_strupper(char * str);
+// 删除前后单双引号
 void    sls_remove_marks(char *s);
 
 uint32_t sls_hash_key(const char *data, int len);

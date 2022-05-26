@@ -26,8 +26,6 @@
 #ifndef _SLSPublisher_INCLUDE_
 #define _SLSPublisher_INCLUDE_
 
-#include <list>
-
 #include "SLSRole.hpp"
 #include "SLSRoleList.hpp"
 #include "SLSMapPublisher.hpp"

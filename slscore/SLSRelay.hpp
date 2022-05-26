@@ -26,8 +26,6 @@
 #ifndef _SLSRelay_INCLUDE_
 #define _SLSRelay_INCLUDE_
 
-#include <list>
-
 #include "SLSRole.hpp"
 #include "SLSMapPublisher.hpp"
 

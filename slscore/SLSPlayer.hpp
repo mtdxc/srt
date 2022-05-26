@@ -38,9 +38,7 @@ public :
 	~CSLSPlayer();
 
     virtual int handler();
-
 private:
-
 
 };
 

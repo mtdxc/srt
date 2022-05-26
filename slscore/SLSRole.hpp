@@ -26,8 +26,6 @@
 #ifndef _SLSRole_INCLUDE_
 #define _SLSRole_INCLUDE_
 
-#include <map>
-
 #include "SLSRole.hpp"
 #include "SLSSrt.hpp"
 #include "SLSMapData.hpp"
